@@ -29,7 +29,8 @@ Building a Tungsten model is easy. All you have to do is write a simple ``tungst
 from typing import List
 
 import torch
-from tungstenkit import BaseIO, model_config, TungstenModel
+
+from tungstenkit import BaseIO, Image, TungstenModel, model_config
 
 
 class Input(BaseIO):
@@ -37,16 +38,11 @@ class Input(BaseIO):
 
 
 class Output(BaseIO):
-    image: io.Image
+    image: Image
 
 
-@model_config(
-    gpu=True,
-    python_packages=["torch", "torchvision"],
-    batch_size=4,
-    description="Text to image"
-)
-class Model(TungstenModel[Input, Output]):
+@model_config(gpu=True, python_packages=["torch", "torchvision"], batch_size=4)
+class ImageGenerator(TungstenModel[Input, Output]):
     def setup(self):
         weights = torch.load("./weights.pth")
         self.model = load_torch_model(weights)
