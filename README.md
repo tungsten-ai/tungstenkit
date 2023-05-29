@@ -1,29 +1,37 @@
-# Tungstenkit: Developer-friendly container toolkit for machine learning
+# Tungstenkit
 
-Tungstenkit is an open-source tool for building standardized containers for machine learning models.
+ML containerization tool with a focus on developer productivity and versatility.
 
-The key features are:
+![Version](https://img.shields.io/pypi/v/tungstenkit?color=%2334D058&label=pypi%20package)
+![License](https://img.shields.io/github/license/tungsten-ai/tungstenkit)
+![Downloads](https://static.pepy.tech/badge/tungstenkit?style=flat-square)
+![Supported Python versions](https://img.shields.io/pypi/pyversions/tungstenkit.svg?color=%2334D058)
 
+[Features](#features) | [Installation](#prerequisites) | [Usage](#usage) | [Getting Started](https://tungsten-ai.github.io/docs/tungsten_model/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
+
+## Features
 - **Easy**: [Require only a few lines of Python code.](#build-a-tungsten-model)
 - **Versatile**: Support multiple usages:
-    - [REST API server](#run-it-as-a-restful-api-server)
-    - [GUI application](#run-it-as-a-gui-application)
-    - [CLI application](#run-it-as-a-cli-application)
-    - [Python function](#run-it-as-a-python-function)
-- **Abstracted**: [User-defined JSON input/output.](#run-it-as-a-restful-api-server)
-- **Standardized**: [Support advanced workflows.](#run-it-as-a-restful-api-server)
+    - [REST API server](#run-as-a-rest-api-server)
+    - [GUI application](#run-as-a-gui-application)
+    - [CLI application](#run-as-a-cli-application)
+    - [Python function](#run-in-a-python-script)
+- **Abstracted**: [User-defined JSON input/output.](#run-as-a-rest-api-server)
 - **Scalable**: Support adaptive batching and clustering (coming soon).
 
-# Learn More
-- [Documentation](https://tungsten-ai.github.io/docs)
-- [Getting Started](https://tungsten-ai.github.io/docs/tungsten_model/getting_started/)
-- [Installation](#prerequisites)
-
----
+## Prerequisites
+- Python 3.7+
+- [Docker](https://docs.docker.com/get-docker/)
+- (Optional) [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker) for running GPU models.
 
 
-# Take the tour
-## Build a Tungsten model
+## Installation
+```shell
+pip install tungstenkit
+```
+
+## Usage
+### Build a Tungsten model
 Building a Tungsten model is easy. All you have to do is write a simple ``tungsten_model.py`` like below:
 
 ```python
@@ -43,7 +51,7 @@ class Output(BaseIO):
 
 
 @model_config(gpu=True, python_packages=["torch", "torchvision"], batch_size=4)
-class ImageGenerator(TungstenModel[Input, Output]):
+class TextToImageModel(TungstenModel[Input, Output]):
     def setup(self):
         weights = torch.load("./weights.pth")
         self.model = load_torch_model(weights)
@@ -62,8 +70,7 @@ $ tungsten build
 ✅ Successfully built tungsten model: 'text-to-image:latest'
 ```
 
-
-## Run it as a REST API server
+### Run as a REST API server
 
 You can start a prediction with a REST API call.
 
@@ -94,7 +101,7 @@ $ curl -X 'POST' 'http://localhost:3000/predict' \
 }
 ```
 
-## Run it as a GUI application
+### Run as a GUI application
 If you need a more user-friendly way to make predictions, start a GUI app with the following command:
 
 ```console
@@ -105,8 +112,8 @@ INFO:     Uvicorn running on http://localhost:8080 (Press CTRL+C to quit)
 
 ![tungsten-dashboard](https://github.com/tungsten-ai/assets/blob/main/common/local-model-demo.gif?raw=true "Tungsten Dashboard")
 
-## Run it as a CLI application
-Also, you can run a prediction through a simple command:
+### Run as a CLI application
+Run a prediction in a terminal:
 ```console
 $ tungsten predict text-to-image \
    -i prompt="a professional photograph of an astronaut riding a horse"
@@ -116,7 +123,7 @@ $ tungsten predict text-to-image \
 }
 ```
 
-## Run it in a Python script
+### Run in a Python script
 If you want to use a Tungsten model in your Python application, use the Python API:
 ```python
 >>> from tungstenkit import models
@@ -127,15 +134,3 @@ If you want to use a Tungsten model in your Python application, use the Python A
 {"image": PosixPath("./output.png")}
 ```
 
----
-
-# Prerequisites
-- Python 3.7+
-- [Docker](https://docs.docker.com/engine/install/)
-- (Optional) [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker) for running GPU models locally. 
-
-
-# Installation
-```shell
-pip install tungstenkit
-```
