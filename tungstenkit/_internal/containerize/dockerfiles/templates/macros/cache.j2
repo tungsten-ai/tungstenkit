@@ -1,0 +1,7 @@
+{%- macro mount_apt_cache() -%}
+--mount=type=cache,target=/var/cache/apt,sharing=locked
+{%- endmacro -%}
+
+{%- macro mount_pip_cache() -%}
+--mount=type=cache,target=/root/.cache/pip,sharing=locked
+{%- endmacro -%}

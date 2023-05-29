@@ -1,0 +1,6 @@
+[project]
+name = "tungstenkit"
+dynamic = ["dependencies"]
+version = "0.0.1"
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
