@@ -1,4 +1,5 @@
-# Tungstenkit
+# Tungstenkit: Developer-friendly container toolkit for machine learning
+
 Tungstenkit is an open-source tool for building standardized containers for machine learning models.
 
 The key features are:
