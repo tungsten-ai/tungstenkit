@@ -51,7 +51,6 @@ class ModelContainer(ServerContainer):
 
             except requests.ConnectionError:
                 time.sleep(MODEL_CHECK_INTERVAL)
-        log_info("")
 
     def convert_file_uris_in_inputs(
         self, inputs: t.List[t.Dict], move: bool = False

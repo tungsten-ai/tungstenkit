@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 import uvicorn
+from fastapi.encoders import jsonable_encoder
 from tabulate import tabulate
 
 from tungstenkit._internal import model_store
@@ -275,7 +276,7 @@ def predict(model_name: str, input: t.Iterable[t.Tuple[str, str]], output_file_d
         {field[0]: field[1] for field in input},
         output_file_dir=output_file_dir,
     )
-    print(json.dumps(output, indent=2))
+    print(json.dumps(jsonable_encoder(output), indent=2))
 
 
 # @model.command()

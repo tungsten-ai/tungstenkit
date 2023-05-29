@@ -61,12 +61,19 @@ class PredInterface(abc.ABC):
 
         # Prepare outputs
         output_list = self._save_output_files(output_list, output_file_path)
+
+        # Cleanup
+        self._cleanup_prediction()
+
         if isinstance(inputs, list):
             return output_list
         return output_list[0]
 
     @abc.abstractmethod
     def _predict(self, inputs: t.List[t.Dict]) -> schemas.PredictionResponse:
+        pass
+
+    def _cleanup_prediction(self):
         pass
 
     def _validate_inputs(self, inputs: t.Any) -> t.List[t.Dict]:

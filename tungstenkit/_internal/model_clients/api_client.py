@@ -36,7 +36,7 @@ class ModelAPIClient:
     def predict(self, inputs: t.Sequence[t.Union[t.Dict, BaseIO]]) -> schemas.PredictionResponse:
         f = furl(self.base_url)
         f.path = f.path / "predict"
-        r = self._post_prediction(url=f.url, inputs=inputs)
+        r = self._post_prediction(url=f.url, inputs=inputs, timeout=None)
         self._check_resp(r, f.url, self.predict)
         return schemas.PredictionResponse.parse_raw(r.text)
 
@@ -87,11 +87,14 @@ class ModelAPIClient:
         self._check_resp(r, f.url, self.cancel_demo)
 
     def _post_prediction(
-        self, url: str, inputs: t.Sequence[t.Union[t.Dict, BaseIO]]
+        self,
+        url: str,
+        inputs: t.Sequence[t.Union[t.Dict, BaseIO]],
+        timeout: t.Optional[float] = CONNECTION_TIMEOUT,
     ) -> requests.Response:
         jsonable = jsonable_encoder(inputs)
         log_request(url=url, method="POST", data=jsonable)
-        return self.sess.post(url=url, json=jsonable, timeout=CONNECTION_TIMEOUT)
+        return self.sess.post(url=url, json=jsonable, timeout=timeout)
 
     def _check_resp(self, resp: requests.Response, url: str, method: t.Callable):
         name = " ".join(method.__name__.split("_"))
