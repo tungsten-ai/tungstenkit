@@ -3,7 +3,7 @@ name = "tungstenkit"
 version = "0.0.1"
 description = "Tungstenkit: Developer-friendly container toolkit for machine learning"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
-homepage = "https://tungsten-ai.github.io/docs"
+homepage = "https://github.com/tungsten-ai/tungstenkit"
 readme = ["README.md"]
 packages = [{include = "tungstenkit"}]
 classifiers = [
