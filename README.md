@@ -17,6 +17,7 @@ The key features are:
 # Learn More
 - [Documentation](https://tungsten-ai.github.io/docs)
 - [Getting Started](https://tungsten-ai.github.io/docs/tungsten_model/getting_started/)
+- [Installation](#prerequisites)
 
 ---
 
