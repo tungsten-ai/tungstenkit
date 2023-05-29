@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "tungstenkit"
-version = "0.0.1a10"
-description = "Tungstenkit is an open-source tool for building standardized containers for machine learning models."
+version = "0.0.1"
+description = "Tungstenkit: Developer-friendly container toolkit for machine learning"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
 homepage = "https://tungsten-ai.github.io/docs"
 readme = ["README.md"]
