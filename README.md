@@ -4,7 +4,7 @@
 [![Downloads](https://static.pepy.tech/badge/tungstenkit?style=flat-square)](https://pypi.org/project/tungstenkit/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/tungstenkit.svg?color=%2334D058)](https://pypi.org/project/tungstenkit/)
 
-[Installation](#prerequisites) | [Features](#features) | [Usage](#usage) | [Getting Started](https://tungsten-ai.github.io/docs/tungsten_model/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
+[Installation](#prerequisites) | [Features](#features) | [Getting Started](https://tungsten-ai.github.io/docs/tungsten_model/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
 
 **Tungstenkit** is ML conterization tool with a focus on developer productivity and versatility. 
 
@@ -207,7 +207,7 @@ class StyleTransferModel(TungstenModel[Input, Output]):
 ```
 
 ### Supports batched prediction
-Batching is crucial for performance of an ML model using GPUs. Tungstenkit supports both server-side and client-side batching.
+Tungstenkit supports both server-side and client-side batching.
 
 - **Server-side batching**  
     A server groups inputs across multiple requests and processes them together.
