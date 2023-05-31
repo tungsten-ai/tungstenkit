@@ -164,7 +164,7 @@ class Model(TungstenModel[Input, Output]):
 ```
 
 ### Can run anywhere Docker is installed
-A model container includes a REST API, so it can run anywhere Docker is installed:
+A model container is runnable itself as a server:
 
 ```
 $ docker run -p 3000:3000 --gpus all text-to-image:latest
