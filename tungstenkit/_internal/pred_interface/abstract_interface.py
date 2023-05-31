@@ -100,7 +100,7 @@ class PredInterface(abc.ABC):
         """
         Convert files in input dict to urls.
 
-        Supported types: ``str``, ``pathlib.Path``, ``tungstenkit.io.File``,
+        Supported types: ``str``, ``pathlib.Path``, ``tungstenkit._internal.io.File``,
         ``io.BufferedIOBase``, ``io.TextIOBase``
         """
         ret = input.copy()

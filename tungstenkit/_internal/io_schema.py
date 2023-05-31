@@ -55,7 +55,7 @@ def validate_input_class(input_cls: t.Type):
             err_msg += f' - "{name}": "{type_}" (unsupported input type)\n'
         err_msg += "Supported input types: " + ", ".join(
             [
-                "'" + "tungstenkit.io." + type_.__name__ + "'"
+                "'" + "tungstenkit." + type_.__name__ + "'"
                 if type_.__module__ == io.__name__
                 else f"'{type_.__name__}'"
                 for type_ in SUPPORTED_INPUT_TYPES
@@ -143,7 +143,7 @@ def validate_output_class(output_cls: t.Type):
         if unsupported_field:
             err_msg += "Supported output types: " + ", ".join(
                 [
-                    "'" + "tungstenkit.io." + type_.__name__ + "'"
+                    "'" + "tungstenkit." + type_.__name__ + "'"
                     if type_.__module__ == io.__name__
                     else f"'{type_.__name__}'"
                     for type_ in SUPPORTED_OUTPUT_TYPES

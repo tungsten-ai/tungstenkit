@@ -6,17 +6,13 @@ import attrs
 import pytest
 
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
-from tungstenkit._internal.container_metadata_store import (
-    ContainerMetadataStore,
-    StoredContainerMetadata,
-)
-from tungstenkit._internal.storables.json_storable import JSONStorable
+from tungstenkit._internal.json_store import JSONCollection, JSONItem, JSONStorable
 
 hashes: t.Set[str] = set()
 
 
 @attrs.define
-class Item(StoredContainerMetadata):
+class Item(JSONItem):
     id: str
     repo_name: str
     tag: str
@@ -69,12 +65,12 @@ class Storable(JSONStorable[Item]):
 
 @pytest.fixture
 def json_store():
-    json_store = ContainerMetadataStore[Item](Item)
+    json_store = JSONCollection[Item](Item)
     yield json_store
     json_store.clear_repo(None)
 
 
-def test_json_store(json_store: ContainerMetadataStore[Item], tmp_path: Path):
+def test_json_store(json_store: JSONCollection[Item], tmp_path: Path):
     file1 = tmp_path / "filer1"
     file1.touch()
     file2 = tmp_path / "file2"
