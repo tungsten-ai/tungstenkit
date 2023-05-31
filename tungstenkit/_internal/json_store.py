@@ -1,23 +1,58 @@
 import abc
 import typing as t
 from pathlib import Path
+from uuid import uuid4
 
 import attrs
 import cattrs
 from filelock import FileLock
 
 from tungstenkit import exceptions
-from tungstenkit._internal.blob_store import Blob, BlobStore
+from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
 from tungstenkit._internal.utils.file import write_safely
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 from tungstenkit._internal.utils.string import camel_to_snake
+from tungstenkit._internal.utils.types import get_superclass_type_args
 
-D = t.TypeVar("D", bound="StoredContainerMetadata")
-C = t.TypeVar("C", bound="_Repositories")
+StorableType = t.TypeVar("StorableType", bound="JSONStorable")
+ItemType = t.TypeVar("ItemType", bound="JSONItem")
+CollectionType = t.TypeVar("CollectionType", bound="_JSONCollection")
 
 
-class StoredContainerMetadata(abc.ABC):
+class JSONStorable(BlobStorable[ItemType]):
+    _store: "JSONCollection[ItemType]"
+
+    def save(self, file_blob_create_policy: FileBlobCreatePolicy = "copy") -> ItemType:
+        blob_store = BlobStore()
+        with blob_store.prevent_deletion():
+            data = self.save_blobs(blob_store, file_blob_create_policy)
+            store = self._get_store()
+            store.add(data)
+            store.tag(data.name, data.repo_name + ":latest")
+        return data
+
+    @classmethod
+    def load(cls: t.Type[StorableType], name: str) -> StorableType:
+        data = cls._get_store().get(name)
+        return cls.load_blobs(data)
+
+    @staticmethod
+    def generate_id() -> str:
+        return uuid4().hex
+
+    @classmethod
+    def _get_store(cls: t.Type[StorableType]) -> "JSONCollection[ItemType]":
+        if not hasattr(cls, "_store"):
+            args = get_superclass_type_args(cls, JSONStorable)
+            if len(args) == 0:
+                raise RuntimeError("Type argument is not set")
+            data_cls: t.Type[ItemType] = args[0]
+            cls._store = JSONCollection[data_cls](data_cls)  # type: ignore
+        return cls._store
+
+
+class JSONItem(abc.ABC):
     @property
     @abc.abstractmethod
     def id(self) -> str:
@@ -25,7 +60,7 @@ class StoredContainerMetadata(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def docker_image_id(self) -> str:
+    def hash(self) -> str:
         pass
 
     @property
@@ -62,13 +97,13 @@ class StoredContainerMetadata(abc.ABC):
 
 
 # TODO encapsulate JSONCollection
-class ContainerMetadataStore(t.Generic[D]):
-    _item_type: t.Type[D]
-    _collection_type: "t.Type[_Repositories[D]]"
+class JSONCollection(t.Generic[ItemType]):
+    _item_type: t.Type[ItemType]
+    _collection_type: "t.Type[_JSONCollection[ItemType]]"
 
-    def __init__(self, item_type: t.Type[D]):
+    def __init__(self, item_type: t.Type[ItemType]):
         self._item_type = item_type
-        self._collection_type = _Repositories[item_type]  # type: ignore
+        self._collection_type = _JSONCollection[item_type]  # type: ignore
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._filelock = FileLock(self.lock_path, timeout=180.0)
         self._blob_store = BlobStore()
@@ -85,7 +120,7 @@ class ContainerMetadataStore(t.Generic[D]):
     def collection_path(self) -> Path:
         return self.base_dir / "collection.json"
 
-    def add(self, item: D):
+    def add(self, item: ItemType):
         """Add to the colleciton and prune dangling items"""
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
@@ -104,7 +139,7 @@ class ContainerMetadataStore(t.Generic[D]):
             col.tag(dest_repo, dest_tag, src.id)  # type: ignore
             col.save(self.collection_path)
 
-    def update(self, item: D) -> None:
+    def update(self, item: ItemType) -> None:
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
             orig = col.get_by_id(item.id)
@@ -113,7 +148,7 @@ class ContainerMetadataStore(t.Generic[D]):
             col.update(item)
             col.save(self.collection_path)
 
-    def get(self, name: str) -> D:
+    def get(self, name: str) -> ItemType:
         repo, tag = self._item_type.parse_name(name)
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
@@ -123,8 +158,9 @@ class ContainerMetadataStore(t.Generic[D]):
             self._raise_not_found_by_name(repo + ":" + tag)
         return item  # type: ignore
 
-    def list(self) -> t.List[D]:
-        ret: t.List[D] = []
+    # TODO Take fields argument
+    def list(self) -> t.List[ItemType]:
+        ret: t.List[ItemType] = []
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
 
@@ -162,14 +198,14 @@ class ContainerMetadataStore(t.Generic[D]):
 
     def _gc(
         self,
-        col: "_Repositories[D]",
+        col: "_JSONCollection[ItemType]",
     ):
         removed_id_and_data = col.prune()
         if len(removed_id_and_data) == 0:
             return
 
         for _, item in removed_id_and_data:
-            if not col.check_hash_duplicate(item.docker_image_id):
+            if not col.check_hash_exsistence(item.hash):
                 item.cleanup()
 
     def _delete_unused_blobs(self):
@@ -189,9 +225,9 @@ class ContainerMetadataStore(t.Generic[D]):
 
 
 @attrs.frozen
-class _Repositories(t.Generic[D]):
+class _JSONCollection(t.Generic[ItemType]):
     repositories: t.Dict[str, t.Dict[str, str]] = attrs.field(factory=dict)
-    items: t.Dict[str, D] = attrs.field(factory=dict)
+    items: t.Dict[str, ItemType] = attrs.field(factory=dict)
 
     def tag(self, repo_name: str, tag: str, id: str):
         if repo_name not in self.repositories.keys():
@@ -201,59 +237,61 @@ class _Repositories(t.Generic[D]):
 
     def add(
         self,
-        item: D,
+        item: ItemType,
     ):
         if item.repo_name not in self.repositories.keys():
             self.repositories[item.repo_name] = dict()
         self.items[item.id] = item
         self.tag(item.repo_name, item.tag, item.id)
 
-    def update(self, item: D):
+    def update(self, item: ItemType):
         orig = self.items[item.id]
         assert orig.id == item.id
         self.items[item.id] = item
 
-    def get_by_tag(self, repo_name: str, tag: str) -> t.Optional[D]:
+    def get_by_tag(self, repo_name: str, tag: str) -> t.Optional[ItemType]:
         if repo_name not in self.repositories or tag not in self.repositories[repo_name]:
             return None
         return self.items[self.repositories[repo_name][tag]]
 
-    def get_by_id(self, id: str) -> t.Optional[D]:
+    def get_by_id(self, id: str) -> t.Optional[ItemType]:
         if id not in self.items:
             return None
         return self.items[id]
 
-    def prune(self, candidate_ids: t.Optional[t.Iterable[str]] = None) -> t.List[t.Tuple[str, D]]:
+    def prune(
+        self, candidate_ids: t.Optional[t.Iterable[str]] = None
+    ) -> t.List[t.Tuple[str, ItemType]]:
         if candidate_ids is None:
             candidate_ids = [id for id in self.items.keys()]
         else:
             candidate_ids = [id for id in candidate_ids if id in self.items.keys()]
 
-        deleted: t.List[t.Tuple[str, D]] = list()
+        deleted: t.List[t.Tuple[str, ItemType]] = list()
         for id in set(candidate_ids):
-            is_removed = not self.check_exsistence_by_id(id)
+            is_removed = not self.check_item_exsistence(id)
             if is_removed:
                 deleted.append((id, self.items[id]))
                 del self.items[id]
 
         return deleted
 
-    def check_exsistence_by_id(self, id: str) -> bool:
+    def check_item_exsistence(self, id: str) -> bool:
         for repo_name in self.repositories.keys():
             if id in self.repositories[repo_name].values():
                 return True
         return False
 
-    def check_hash_duplicate(self, hash_val: str) -> bool:
+    def check_hash_exsistence(self, hash_val: str) -> bool:
         for repo_name in self.repositories.keys():
             for id in self.repositories[repo_name].values():
                 data = self.items[id]
-                if data.docker_image_id == hash_val:
+                if data.hash == hash_val:
                     return True
         return False
 
-    def cleanup(self, removed: D):
-        if not self.check_hash_duplicate(removed.docker_image_id):
+    def cleanup(self, removed: ItemType):
+        if not self.check_hash_exsistence(removed.hash):
             removed.cleanup()
 
     def save(self, path: Path):
@@ -261,7 +299,9 @@ class _Repositories(t.Generic[D]):
         write_safely(path, serialized)
 
     @classmethod
-    def load(cls: t.Type[C], item_type: t.Type[D], path: Path) -> C:
+    def load(
+        cls: t.Type[CollectionType], item_type: t.Type[ItemType], path: Path
+    ) -> CollectionType:
         if not path.exists():
             return cls()
 

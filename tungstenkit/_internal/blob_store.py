@@ -1,3 +1,4 @@
+import abc
 import hashlib
 import os
 import shutil
@@ -14,6 +15,8 @@ from typing_extensions import Literal, TypeAlias
 from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
 from tungstenkit._internal.utils.file import list_dirs, list_files
 
+BlobStorableType = t.TypeVar("BlobStorableType", bound="BlobStorable")
+BlobContainerType = t.TypeVar("BlobContainerType")
 FileBlobCreatePolicy: TypeAlias = Literal["copy", "rename"]
 BUF_SIZE_FOR_HASHING = 1048576  # 1MB
 
@@ -25,6 +28,19 @@ class Blob:
 
     def remove(self):
         shutil.rmtree(self.file_path.parent)
+
+
+class BlobStorable(abc.ABC, t.Generic[BlobContainerType]):
+    @abc.abstractmethod
+    def save_blobs(
+        self, blob_store: "BlobStore", file_blob_create_policy: FileBlobCreatePolicy = "copy"
+    ) -> BlobContainerType:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def load_blobs(cls: t.Type[BlobStorableType], data: BlobContainerType) -> BlobStorableType:
+        pass
 
 
 class BlobStore:

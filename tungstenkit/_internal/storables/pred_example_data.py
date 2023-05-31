@@ -5,11 +5,9 @@ from pathlib import Path
 
 import attrs
 
-from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
+from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.utils.json import apply_to_jsonable
 from tungstenkit._internal.utils.uri import get_path_from_file_url
-
-from .blob_container import BlobContainer
 
 
 @attrs.frozen(kw_only=True)
@@ -28,7 +26,7 @@ class StoredPredExampleData:
 
 
 @attrs.define(kw_only=True)
-class PredExampleData(BlobContainer[StoredPredExampleData]):
+class PredExampleData(BlobStorable[StoredPredExampleData]):
     input: t.Dict
     output: t.Dict
     demo_output: t.Dict

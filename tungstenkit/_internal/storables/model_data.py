@@ -4,12 +4,11 @@ from datetime import datetime
 import attrs
 
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
-from tungstenkit._internal.container_metadata_store import StoredContainerMetadata
+from tungstenkit._internal.json_store import JSONItem, JSONStorable
 from tungstenkit._internal.utils.docker import get_docker_client, parse_docker_image_name
 
 from .avatar_data import AvatarData, StoredAvatarData
 from .io_schema_data import IOSchemaData, StoredIOSchemaData
-from .json_storable import JSONStorable
 from .markdown_data import MarkdownData, StoredMarkdownData
 from .pred_example_data import PredExampleData, StoredPredExampleData
 
@@ -75,7 +74,7 @@ class _ModelDataInImage:
 
 
 @attrs.frozen(kw_only=True)
-class StoredModelData(_ModelDataInImage, StoredContainerMetadata):
+class StoredModelData(_ModelDataInImage, JSONItem):
     id: str
     repo_name: str
     tag: str
@@ -86,6 +85,10 @@ class StoredModelData(_ModelDataInImage, StoredContainerMetadata):
     examples: t.Dict[str, StoredPredExampleData] = attrs.field(factory=dict)
 
     created_at: datetime = attrs.field(factory=datetime.utcnow)
+
+    @property
+    def hash(self) -> str:
+        return self.docker_image_id
 
     @property
     def blobs(self) -> t.Set[Blob]:

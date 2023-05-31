@@ -1,9 +1,7 @@
 import attrs
 
-from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
+from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.utils.avatar import fetch_default_avatar_png
-
-from .blob_container import BlobContainer
 
 
 @attrs.frozen(kw_only=True)
@@ -16,7 +14,7 @@ class StoredAvatarData:
 
 
 @attrs.define(kw_only=True)
-class AvatarData(BlobContainer[StoredAvatarData]):
+class AvatarData(BlobStorable[StoredAvatarData]):
     bytes_: bytes
     extension: str
 

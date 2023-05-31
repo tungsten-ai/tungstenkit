@@ -1,10 +1,9 @@
 import typing as t
 
+from tungstenkit._internal.json_store import JSONCollection
 from tungstenkit._internal.storables.model_data import ModelData, StoredModelData
 
-from .container_metadata_store import ContainerMetadataStore
-
-_store = ContainerMetadataStore[StoredModelData](StoredModelData)
+_store = JSONCollection[StoredModelData](StoredModelData)
 
 
 def get(name: str) -> ModelData:

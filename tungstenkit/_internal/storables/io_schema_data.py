@@ -3,10 +3,8 @@ import typing as t
 
 import attrs
 
-from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
+from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.io import FileType
-
-from .blob_container import BlobContainer
 
 
 @attrs.frozen(kw_only=True)
@@ -18,7 +16,7 @@ class StoredIOSchemaData:
 
 
 @attrs.define(kw_only=True)
-class IOSchemaData(BlobContainer[StoredIOSchemaData]):
+class IOSchemaData(BlobStorable[StoredIOSchemaData]):
     input: t.Dict
     output: t.Dict
     input_filetypes: t.Dict[str, FileType]

@@ -6,7 +6,7 @@ import attrs
 from furl import furl
 
 from tungstenkit import exceptions
-from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
+from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.utils.markdown import (
     apply_to_image_link_in_markdown,
     change_img_links_in_markdown,
@@ -14,8 +14,6 @@ from tungstenkit._internal.utils.markdown import (
 )
 from tungstenkit._internal.utils.requests import download_files_in_threadpool
 from tungstenkit._internal.utils.uri import get_path_from_file_url
-
-from .blob_container import BlobContainer
 
 
 @attrs.define(kw_only=True)
@@ -25,7 +23,7 @@ class StoredMarkdownData:
 
 
 @attrs.define(kw_only=True)
-class MarkdownData(BlobContainer[StoredMarkdownData]):
+class MarkdownData(BlobStorable[StoredMarkdownData]):
     content: str
     image_files: t.List[Path] = attrs.field(factory=list)
 
