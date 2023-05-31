@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request
 from fasteners import ReaderWriterLock
 
 from tungstenkit._internal.blob_store import BlobStore
-from tungstenkit._internal.json_store import JSONStore
+from tungstenkit._internal.container_metadata_store import ContainerMetadataStore
 from tungstenkit._internal.logging import log_error
 from tungstenkit._internal.storables import PredExampleData, StoredModelData, StoredPredExampleData
 from tungstenkit._internal.utils.json import apply_to_jsonable
@@ -116,8 +116,8 @@ class ExampleService:
     prediction_service: PredictionService
 
     _blob_store: BlobStore = attrs.field(factory=BlobStore, init=False)
-    _model_store: JSONStore[StoredModelData] = attrs.field(
-        factory=lambda: JSONStore[StoredModelData](StoredModelData), init=False
+    _model_store: ContainerMetadataStore[StoredModelData] = attrs.field(
+        factory=lambda: ContainerMetadataStore[StoredModelData](StoredModelData), init=False
     )
     _loaded_examples: t.Dict[str, LoadedExample] = attrs.field(factory=dict, init=False)
     _delete_lock: ReaderWriterLock = attrs.field(factory=ReaderWriterLock, init=False)

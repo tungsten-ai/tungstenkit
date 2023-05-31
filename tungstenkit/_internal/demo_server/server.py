@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from tungstenkit._internal.container_metadata_store import ContainerMetadataStore
 from tungstenkit._internal.containers import ModelContainer
-from tungstenkit._internal.json_store import JSONStore
 from tungstenkit._internal.logging import log_error
 from tungstenkit._internal.model_clients import ModelContainerClient
 from tungstenkit._internal.storables import StoredModelData
@@ -52,7 +52,7 @@ def _add_api_endpoints(
     file_dir: Path,
 ):
     # Load model data from store
-    store = JSONStore[StoredModelData](StoredModelData)
+    store = ContainerMetadataStore[StoredModelData](StoredModelData)
     stored_model_data = store.get(model_container.model_name)
 
     # Prepare services

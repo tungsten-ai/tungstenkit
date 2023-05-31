@@ -2,17 +2,20 @@ import typing as t
 from uuid import uuid4
 
 from tungstenkit._internal.blob_store import BlobStore, FileBlobCreatePolicy
-from tungstenkit._internal.json_store import JSONItem, JSONStore
+from tungstenkit._internal.container_metadata_store import (
+    ContainerMetadataStore,
+    StoredContainerMetadata,
+)
 from tungstenkit._internal.utils.types import get_superclass_type_args
 
 from .blob_container import BlobContainer
 
-D = t.TypeVar("D", bound=JSONItem)
+D = t.TypeVar("D", bound=StoredContainerMetadata)
 S = t.TypeVar("S", bound="JSONStorable")
 
 
 class JSONStorable(BlobContainer[D]):
-    _store: JSONStore[D]
+    _store: ContainerMetadataStore[D]
 
     def save(self, file_blob_create_policy: FileBlobCreatePolicy = "copy") -> D:
         blob_store = BlobStore()
@@ -33,11 +36,11 @@ class JSONStorable(BlobContainer[D]):
         return uuid4().hex
 
     @classmethod
-    def _get_store(cls: t.Type[S]) -> JSONStore[D]:
+    def _get_store(cls: t.Type[S]) -> ContainerMetadataStore[D]:
         if not hasattr(cls, "_store"):
             args = get_superclass_type_args(cls, JSONStorable)
             if len(args) == 0:
                 raise RuntimeError("Type argument is not set")
             data_cls: t.Type[D] = args[0]
-            cls._store = JSONStore[data_cls](data_cls)  # type: ignore
+            cls._store = ContainerMetadataStore[data_cls](data_cls)  # type: ignore
         return cls._store

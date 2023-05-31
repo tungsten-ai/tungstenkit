@@ -10,9 +10,8 @@ import typing as t
 
 from typing_extensions import Protocol
 
-from tungstenkit import exceptions
+from tungstenkit import BaseIO, exceptions
 from tungstenkit._internal.utils import types as type_utils
-from tungstenkit.io import BaseIO
 
 DEFINED_MODEL_SET: t.Set[type] = set()
 
