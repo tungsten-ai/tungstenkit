@@ -173,7 +173,7 @@ INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
 ```
 
 ### Pydantic input/output definitions with convenient file handling
-Let's look the example below:
+Let's look at the example below:
 ```python
 from tungstenkit import BaseIO, Image, TungstenModel
 
@@ -191,7 +191,7 @@ class StyleTransferModel(TungstenModel[Input, Output]):
 ```
 As you see, input/output types are defined as subclasses of the ``BaseIO`` class. The ``BaseIO`` class is a simple wrapper of the [``BaseModel``](https://docs.pydantic.dev/latest/usage/models/) class of [Pydantic](https://docs.pydantic.dev/latest/), and Tungstenkit validates JSON requests utilizing functionalities Pydantic provides.
 
-Also, you can see that the ``Image`` class is used. Tungstenkit provides four file classes for easing file handling - ``Image``, ``Audio``, ``Video``, and ``Binary``. They have methods useful to write a model's ``predict`` method:
+Also, you can see that the ``Image`` class is used. Tungstenkit provides four file classes for easing file handling - ``Image``, ``Audio``, ``Video``, and ``Binary``. They have useful methods for writing a model's ``predict`` method:
 
 ```python
 class StyleTransferModel(TungstenModel[Input, Output]):
@@ -211,7 +211,7 @@ Tungstenkit supports both server-side and client-side batching.
 
 - **Server-side batching**  
     A server groups inputs across multiple requests and processes them together.
-    You can configurate the max batch size:
+    You can configure the max batch size:
     ```python
     @model_config(gpu=True, batch_size=32)
     class Model(TungstenModel[Input, Output]):
