@@ -18,7 +18,9 @@ from .demo_server.fixtures import *  # noqa
 from .dummy_model_fixtures import *  # noqa
 from .model_server.fixtures import *  # noqa
 from .storables.fixtures import *  # noqa
+from .utils.fixtures import *  # noqa
 
+# Enable vscode debugger to catch exc
 if os.getenv("_PYTEST_RAISE", "0") != "0":
 
     @pytest.hookimpl(tryfirst=True)

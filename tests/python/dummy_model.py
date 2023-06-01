@@ -24,7 +24,7 @@ class DummyOutput(BaseIO):
 @model_config(
     batch_size=4,
     readme_md=str(README_PATH),
-    include_files=["./dummy_model.py"],
+    include_files=["./dummy_model.py", "./bin"],
 )
 class DummyModel(TungstenModel[DummyInput, DummyOutput]):
     failure: bool = False
