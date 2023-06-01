@@ -93,8 +93,8 @@ class TungstenClient:
             log_info(f"Creating a model in {self.api.base_url}")
             req = schemas.ModelCreate(
                 docker_image=f'{remote_docker_repo.split("/")[-1]}:{remote_docker_tag}',
-                input_schema=model.io_schema.input,
-                output_schema=model.io_schema.output,
+                input_schema=model.io_schema.input_jsonschema,
+                output_schema=model.io_schema.output_jsonschema,
                 description=model.description,
                 batch_size=model.batch_size,
                 gpu=model.gpu,
@@ -163,8 +163,8 @@ class TungstenClient:
 
             avatar = self._get_model_avatar(project=project, model_version=model_version)
             io_schema = storables.IOSchemaData(
-                input=model_in_server.input_schema,
-                output=model_in_server.output_schema,
+                input_jsonschema=model_in_server.input_schema,
+                output_jsonschema=model_in_server.output_schema,
                 input_filetypes=model_in_server.input_filetypes,
                 output_filetypes=model_in_server.output_filetypes,
             )

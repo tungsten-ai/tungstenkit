@@ -57,8 +57,8 @@ def build_model(
 
             # Add to the local store
             io_schema = storables.IOSchemaData(
-                input=input_schema,
-                output=output_schema,
+                input_jsonschema=input_schema,
+                output_jsonschema=output_schema,
                 input_filetypes=model_config.input_filetypes,
                 output_filetypes=model_config.output_filetypes,
             )

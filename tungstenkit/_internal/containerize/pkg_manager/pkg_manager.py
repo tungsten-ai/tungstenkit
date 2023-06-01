@@ -5,7 +5,7 @@ import attrs
 from packaging.version import Version
 
 from tungstenkit import exceptions
-from tungstenkit._internal.constants import MIN_PYTHON_VER_FOR_TUNGSTENKIT
+from tungstenkit._internal.constants import MAX_SUPPORTED_PYTHON_VER, MIN_SUPPORTED_PYTHON_VER
 from tungstenkit._internal.logging import log_info
 from tungstenkit._internal.utils.version import (
     NotRequired,
@@ -130,10 +130,12 @@ class PythonPackageManager:
         2) The latest version among candidates
         """
         this_py_ver_in_sys = sys.version_info
-        # TODO check available python versions for miniforge3
-        default_py_ver = max(
-            Version(f"{this_py_ver_in_sys.major}.{this_py_ver_in_sys.minor}"),
-            MIN_PYTHON_VER_FOR_TUNGSTENKIT,
+        default_py_ver = min(
+            max(
+                Version(f"{this_py_ver_in_sys.major}.{this_py_ver_in_sys.minor}"),
+                MIN_SUPPORTED_PYTHON_VER,
+            ),
+            MAX_SUPPORTED_PYTHON_VER,
         )
         list_py_ver_sets = [
             collection.get_available_py_vers(list(self._required_gpu_pkg_names[collection_name]))

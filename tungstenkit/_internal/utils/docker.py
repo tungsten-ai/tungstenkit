@@ -8,6 +8,7 @@ import time
 import typing as t
 from contextlib import contextmanager
 from enum import Enum, auto
+from pathlib import Path, PurePosixPath
 
 import attrs
 import docker
@@ -185,28 +186,6 @@ def check_if_docker_available():
         )
 
 
-def copy_from_docker_container(
-    container: Container,
-    src: str,
-    dest: str,
-    container_desc: t.Optional[str] = None,
-    check: bool = True,
-):
-    """Copy files or directory from docker container to host"""
-    ret = subprocess.run(["docker", "cp", f"{container.id}:{src}", dest])
-    if check and ret.returncode != 0:
-        err = "Failed to copy files from a container of"
-        if container_desc:
-            err += f" {container_desc}"
-        else:
-            image: Image = container.image
-            err += f" the image {image.short_id.split(':')[-1]}"
-            if image.tags:
-                err += ", ".join([f"'{tag}'" for tag in image.tags])
-        raise DockerError(err)
-    return ret == 0
-
-
 def login_to_docker_registry(
     registry: str, auth_config: t.Dict[str, str], check: bool = True
 ) -> bool:
@@ -279,7 +258,7 @@ def print_container_logs(
         print(err_msg)
 
 
-def remove_container(
+def remove_docker_container(
     container_name_or_id: str, force: bool = False, docker_client: t.Optional[DockerClient] = None
 ):
     docker_client = docker_client if docker_client else get_docker_client()
@@ -305,6 +284,61 @@ def remove_docker_image(
         if force:
             return
         raise DockerError(f"image {image_name_or_id} not found")
+
+
+def copy_from_image(
+    image_name_or_id: str,
+    path_in_image: PurePosixPath,
+    path_in_host: Path,
+    image_desc: t.Optional[str] = None,
+    docker_client: t.Optional[DockerClient] = None,
+) -> None:
+    path_in_host = path_in_host.resolve()
+    if path_in_host.exists():
+        if not path_in_host.is_dir():
+            raise DockerError(f"Not a directory: {path_in_host}")
+
+    path_in_host.parent.mkdir(parents=True, exist_ok=True)
+
+    docker_client = docker_client if docker_client else get_docker_client()
+    image: Image = docker_client.images.get(image_name_or_id)
+
+    container: Container = docker_client.containers.create(image)
+
+    try:
+        _cp(
+            f"{container.name}:{path_in_image}",
+            str(path_in_host.resolve()),
+            err_msg=f"Failed to extract {image_desc if image_desc else image_name_or_id}",
+        )
+    finally:
+        remove_docker_container(container.id, docker_client=docker_client)
+
+
+def export_image_to_file(
+    image_name_or_id: str,
+    output_path: Path,
+    image_desc: t.Optional[str] = None,
+    docker_client: t.Optional[DockerClient] = None,
+):
+    # Get container
+    docker_client = docker_client if docker_client else get_docker_client()
+    image: Image = docker_client.images.get(image_name_or_id)
+    container: Container = docker_client.containers.create(image)
+
+    # Export the container
+    try:
+        _export(
+            container.name,
+            output=str(output_path),
+            err_msg=f"Failed to export {image_desc if image_desc else image_name_or_id}",
+        )
+    finally:
+        remove_docker_container(container.id, docker_client=docker_client)
+
+
+def import_image_from_file(tarball_path: Path, name: str):
+    _import(str(tarball_path), name, err_msg=f"Failed to import '{tarball_path}' to {name}")
 
 
 @contextmanager
@@ -394,6 +428,10 @@ def start_server_container(
         termination_event.set()
         container.remove(force=True)
         signal.signal(signal.SIGUSR1, orig_sigusr1_handler)
+
+
+def run(*docker_run_args: str):
+    subprocess.run(["docker", "run"] + list(docker_run_args))
 
 
 def _run_pull_or_push(
@@ -513,3 +551,25 @@ def _build_pull_push_progress():
 
 def _docker_status_to_desc(status: str, id: str) -> str:
     return f"[blue]\[{id}] {status}[/blue]"
+
+
+def _cp(src: str, dest: str, err_msg: str):
+    args = ["docker", "cp", src, dest]
+    try:
+        subprocess.run(args, check=True)
+    except subprocess.CalledProcessError:
+        raise DockerError(err_msg)
+
+
+def _export(container_name_or_id: str, output: str, err_msg: str):
+    try:
+        subprocess.run(["docker", "export", "--output", output, container_name_or_id], check=True)
+    except subprocess.CalledProcessError:
+        raise DockerError(err_msg)
+
+
+def _import(tarball: str, name: str, err_msg: str):
+    try:
+        subprocess.run(["docker", "import", tarball, name], check=True)
+    except subprocess.CalledProcessError:
+        raise DockerError(err_msg)

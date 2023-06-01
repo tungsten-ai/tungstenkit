@@ -44,4 +44,6 @@ LOCK_DIR.mkdir(parents=True, exist_ok=True)
 WORKING_DIR_IN_CONTAINER = PurePosixPath("/tungsten")
 TUNGSTEN_DIR_IN_CONTAINER = PurePosixPath("/etc/tungsten")
 
-MIN_PYTHON_VER_FOR_TUNGSTENKIT = Version("3.7")
+MIN_SUPPORTED_PYTHON_VER = Version("3.7")
+MAX_SUPPORTED_PYTHON_VER = Version("3.11")
+MAX_SOURCE_FILE_SIZE = 10 * 1024 * 1024

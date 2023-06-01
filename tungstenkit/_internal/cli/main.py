@@ -10,7 +10,7 @@ from tungstenkit._internal.utils.docker import check_if_docker_available
 from tungstenkit._versions import pkg_version
 
 # from .login_command import login
-from .model_commands import model
+from .model_commands import import_image, list_models, model
 from .options import common_options
 
 
@@ -41,8 +41,10 @@ def main():
     # cli.add_command(login, "login")
     cli.add_command(model, "model")
     for name, cmd in model.commands.items():
-        if name == "list":
+        if name == list_models.name:
             cli.add_command(cmd, "models")
+        elif name == import_image.name:
+            cli.add_command(cmd, "import")
         else:
             cli.add_command(cmd, name)
     cli()

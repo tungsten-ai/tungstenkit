@@ -7,7 +7,12 @@ from filelock import FileLock
 from packaging.version import Version
 from pydantic import AnyHttpUrl, BaseModel, Field, create_model, validator
 
-from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
+from tungstenkit._internal.constants import (
+    DATA_DIR,
+    LOCK_DIR,
+    MAX_SUPPORTED_PYTHON_VER,
+    MIN_SUPPORTED_PYTHON_VER,
+)
 from tungstenkit._internal.io import BaseIO, FileType
 from tungstenkit._internal.io_schema import get_filetypes
 from tungstenkit.exceptions import NotLoggedIn
@@ -67,10 +72,20 @@ class BuildConfig(BaseModel):
         arbitrary_types_allowed = True
 
     @validator("cuda_version")
-    def validate_cuda_version(cls, v, values, **kwargs):
+    def validate_cuda_ver(cls, v, values, **kwargs):
         if not values["gpu"] and v is not None:
             raise ValueError("'gpu' is not set")
         return v
+
+    @validator("python_version")
+    def validate_py_ver(cls, v: t.Optional[_Version]):
+        if v is not None:
+            if v < MIN_SUPPORTED_PYTHON_VER or v > MAX_SUPPORTED_PYTHON_VER:
+                raise ValueError(
+                    f"unsupported Python version: {str(v)}. "
+                    "Tungstenkit supports Python version "
+                    f"from {MIN_SUPPORTED_PYTHON_VER} to {MAX_SUPPORTED_PYTHON_VER}"
+                )
 
 
 class ModelConfig(BuildConfig):

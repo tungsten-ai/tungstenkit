@@ -1,7 +1,7 @@
 import json
 import typing as t
 from datetime import datetime
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PurePosixPath
 
 import attrs
 import cattrs
@@ -33,7 +33,7 @@ def save_attrs_as_yaml(obj, path: Path):
         f.write(dumped)
 
 
-def load_attrs_from_yaml(cls, path: Path):
+def load_attrs_from_yaml(cls: t.Type[T], path: Path) -> T:
     with open(path, "r") as f:
         dict = yaml.load(f, Loader=yaml.Loader)
 
@@ -49,7 +49,7 @@ def save_attrs_as_json(obj, path: Path):
         json.dump(d, f, indent=2)
 
 
-def load_attrs_from_json(cls, path: Path):
+def load_attrs_from_json(cls: t.Type[T], path: Path) -> T:
     with open(path, "r") as f:
         dict = json.load(f)
 
@@ -77,5 +77,6 @@ register_unstructure_hook(PurePath, lambda p: str(p))
 register_unstructure_hook(Version, lambda v: str(v))
 
 register_structure_hook(Path, lambda s: Path(s))
+register_structure_hook(PurePosixPath, lambda s: PurePosixPath(s))
 register_structure_hook(Version, lambda s: Version(s))
 register_structure_hook(datetime, lambda s: datetime.fromisoformat(s))

@@ -61,7 +61,9 @@ def _add_api_endpoints(
     prediction_service = PredictionService(
         file_service=file_service,
         model_client=model_client,
-        input_schema=json.loads(stored_model_data.io_schema.input.file_path.read_bytes()),
+        input_schema=json.loads(
+            stored_model_data.io_schema.input_jsonschema.file_path.read_bytes()
+        ),
     )
     example_service = ExampleService(
         model_name=stored_model_data.name,

@@ -33,12 +33,12 @@ class Metadata(BaseModel):
         global _input_schema, _output_schema, _readme, _avatar_filename
         # Load schemas
         _input_schema = (
-            json.loads(model.io_schema.input.file_path.read_text())
+            json.loads(model.io_schema.input_jsonschema.file_path.read_text())
             if _input_schema is None
             else _input_schema
         )
         _output_schema = (
-            json.loads(model.io_schema.output.file_path.read_text())
+            json.loads(model.io_schema.output_jsonschema.file_path.read_text())
             if _output_schema is None
             else _output_schema
         )

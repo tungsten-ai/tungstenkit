@@ -17,13 +17,13 @@ from tungstenkit._internal.utils.uri import get_path_from_file_url
 
 
 @attrs.define(kw_only=True)
-class StoredMarkdownData:
+class StoredMarkdown:
     markdown: Blob
     images: t.List[Blob] = attrs.field(factory=list)
 
 
 @attrs.define(kw_only=True)
-class MarkdownData(BlobStorable[StoredMarkdownData]):
+class MarkdownData(BlobStorable[StoredMarkdown]):
     content: str
     image_files: t.List[Path] = attrs.field(factory=list)
 
@@ -31,7 +31,7 @@ class MarkdownData(BlobStorable[StoredMarkdownData]):
         self,
         blob_store: BlobStore,
         file_blob_create_policy: FileBlobCreatePolicy = "copy",
-    ) -> StoredMarkdownData:
+    ) -> StoredMarkdown:
         with tempfile.TemporaryDirectory() as download_dir_str:
             download_dir = Path(download_dir_str)
             content = _download_remote_images_in_readme(
@@ -48,10 +48,10 @@ class MarkdownData(BlobStorable[StoredMarkdownData]):
             content = _update_readme_image_files(content, image_files, image_blobs)
 
             blob = blob_store.add_by_writing((content.encode("utf-8"), "README.md"))
-            return StoredMarkdownData(markdown=blob, images=image_blobs)
+            return StoredMarkdown(markdown=blob, images=image_blobs)
 
     @staticmethod
-    def load_blobs(stored: StoredMarkdownData) -> "MarkdownData":
+    def load_blobs(stored: StoredMarkdown) -> "MarkdownData":
         return MarkdownData(
             content=stored.markdown.file_path.read_text(),
             image_files=[b.file_path for b in stored.images],

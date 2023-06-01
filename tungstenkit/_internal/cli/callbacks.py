@@ -1,12 +1,14 @@
 import os
 import typing as t
 from pathlib import Path
+from typing import Optional
 
 from rich import print as rprint
 
 from tungstenkit import exceptions
 from tungstenkit._internal import model_store
 from tungstenkit._internal.constants import default_model_repo
+from tungstenkit._internal.utils import regex
 
 
 def project_name_callback(ctx, param, project_name: str) -> str:
@@ -93,3 +95,7 @@ def input_fields_callback(ctx, param, input_fields: t.Tuple[str]) -> t.List[t.Tu
         fields.append((splitted[0], splitted[1]))
 
     return fields
+
+
+def model_name_validator(ctx, param, name: Optional[str]) -> t.Optional[str]:
+    return regex.validate_docker_image_name(name) if name else None

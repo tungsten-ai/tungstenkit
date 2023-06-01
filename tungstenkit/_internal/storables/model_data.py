@@ -8,10 +8,10 @@ from tungstenkit._internal.json_store import JSONItem, JSONStorable
 from tungstenkit._internal.utils.docker import get_docker_client, parse_docker_image_name
 
 from .avatar_data import AvatarData, StoredAvatarData
-from .io_schema_data import IOSchemaData, StoredIOSchemaData
-from .markdown_data import MarkdownData, StoredMarkdownData
+from .io_schema_data import IOSchemaData, StoredIOSchema
+from .markdown_data import MarkdownData, StoredMarkdown
 from .pred_example_data import PredExampleData, StoredPredExampleData
-from .source_tree_data import SourceTreeData, StoredSourceTreeData
+from .source_file_data import SerializedSourceFileCollection, SourceFile, SourceFileCollection
 
 
 @attrs.define(kw_only=True)
@@ -80,10 +80,11 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     repo_name: str
     tag: str
 
-    io_schema: StoredIOSchemaData
+    io_schema: StoredIOSchema
     avatar: StoredAvatarData
-    readme: t.Optional[StoredMarkdownData] = None
+    readme: t.Optional[StoredMarkdown] = None
     examples: t.Dict[str, StoredPredExampleData] = attrs.field(factory=dict)
+    source_files: t.Optional[SerializedSourceFileCollection] = None
 
     created_at: datetime = attrs.field(factory=datetime.utcnow)
 
@@ -95,8 +96,8 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     def blobs(self) -> t.Set[Blob]:
         blob_set: t.Set[Blob] = set()
 
-        blob_set.add(self.io_schema.input)
-        blob_set.add(self.io_schema.output)
+        blob_set.add(self.io_schema.input_jsonschema)
+        blob_set.add(self.io_schema.output_jsonschema)
 
         blob_set.add(self.avatar.blob)
 
@@ -140,6 +141,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
     avatar: AvatarData
     readme: t.Optional[MarkdownData] = None
     examples: t.List[PredExampleData] = attrs.field(factory=list)
+    source_files: t.Optional[SourceFileCollection] = None
 
     _created_at: t.Optional[datetime] = attrs.field(default=None, alias="created_at")
 
@@ -151,6 +153,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         avatar: AvatarData,
         readme: t.Optional[MarkdownData] = None,
         examples: t.Optional[t.List[PredExampleData]] = None,
+        source_files: t.Optional[t.Iterable[SourceFile]] = None,
         id: t.Optional[str] = None,
         created_at: t.Optional[datetime] = None,
     ):
@@ -164,6 +167,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         self.avatar = avatar
         self.readme = readme
         self.examples = examples if examples else []
+        self.source_files = SourceFileCollection(source_files) if source_files else None
         self._created_at = created_at
 
         attributes_from_image = attrs.asdict(
@@ -178,6 +182,10 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             self._created_at = datetime.utcnow()
         return self._created_at
 
+    @property
+    def short_name(self) -> str:
+        return self.repo_name.split("/")[-1]
+
     def save_blobs(
         self,
         blob_store: BlobStore,
@@ -190,14 +198,27 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         else:
             stored_readme = None
 
-        stored_schema = self.io_schema.save_blobs(blob_store=blob_store)
-        stored_avatar = self.avatar.save_blobs(blob_store=blob_store)
+        stored_schema = self.io_schema.save_blobs(
+            blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
+        )
+
+        stored_avatar = self.avatar.save_blobs(
+            blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
+        )
+
         stored_examples = dict()
         for example in self.examples:
             e = example.save_blobs(
                 blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
             )
             stored_examples[e.id] = e
+
+        if self.source_files:
+            stored_source_files = self.source_files.save_blobs(
+                blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
+            )
+        else:
+            stored_source_files = None
 
         extra_kwargs = dict()
         if self._created_at:
@@ -211,6 +232,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             io_schema=stored_schema,
             avatar=stored_avatar,
             examples=stored_examples,
+            source_files=stored_source_files,
             module_name=self.module_name,
             class_name=self.class_name,
             docker_image_id=self.docker_image_id,
@@ -231,5 +253,8 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             readme=MarkdownData.load_blobs(data.readme) if data.readme else None,
             examples=[PredExampleData.load_blobs(e) for e in data.examples.values()]
             if data.examples
+            else None,
+            source_files=SourceFileCollection.load_blobs(data.source_files).files
+            if data.source_files
             else None,
         )
