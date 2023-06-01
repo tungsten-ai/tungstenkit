@@ -11,6 +11,7 @@ from .avatar_data import AvatarData, StoredAvatarData
 from .io_schema_data import IOSchemaData, StoredIOSchemaData
 from .markdown_data import MarkdownData, StoredMarkdownData
 from .pred_example_data import PredExampleData, StoredPredExampleData
+from .source_tree_data import SourceTreeData, StoredSourceTreeData
 
 
 @attrs.define(kw_only=True)
@@ -94,14 +95,16 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     def blobs(self) -> t.Set[Blob]:
         blob_set: t.Set[Blob] = set()
 
-        # io schema
         blob_set.add(self.io_schema.input)
         blob_set.add(self.io_schema.output)
+
         blob_set.add(self.avatar.blob)
+
         if self.readme is not None:
             blob_set.add(self.readme.markdown)
             for b in self.readme.images:
                 blob_set.add(b)
+
         if self.examples is not None:
             for example in self.examples.values():
                 blob_set.add(example.input)

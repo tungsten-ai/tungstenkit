@@ -44,43 +44,40 @@ class BlobStorable(abc.ABC, t.Generic[BlobContainerType]):
 
 
 class BlobStore:
-    _base_dir: Path = DATA_DIR / "blobs"
-    _lock_path: Path = LOCK_DIR / "blobs.lock"
+    _base_dir: t.ClassVar[Path] = DATA_DIR / "blobs"
+    _lock_path: t.ClassVar[Path] = LOCK_DIR / "blobs.lock"
 
-    @property
-    def _data_dir(self) -> Path:
-        return self._base_dir / "data"
+    __data_dir: Path
 
     def __init__(self) -> None:
-        self._data_dir.mkdir(parents=True, exist_ok=True)
+        self.__data_dir = self._base_dir / "data"
+        self.__data_dir.mkdir(parents=True, exist_ok=True)
         self._lock = InterProcessReaderWriterLock(path=self._lock_path)
 
     def list_digests(self) -> t.List[str]:
-        return [d.name for d in list_dirs(self._data_dir)]
+        return [d.name for base_dir in list_dirs(self.__data_dir) for d in list_dirs(base_dir)]
 
     def get_by_digest(self, digest: str) -> Blob:
-        blob_dir = self._data_dir / digest
+        blob_dir = self._build_blob_dir_path(digest)
         if not blob_dir.exists():
             raise KeyError(f"Blob not found: {digest}")
 
         return Blob(digest=digest, file_path=list_files(blob_dir)[0])
 
     def check_if_contained(self, digest: str) -> bool:
-        return (self._data_dir / digest).exists()
+        return self._build_blob_dir_path(digest).exists()
 
-    def add_multiple_by_writing(
-        self, *seq_paths_and_named_bytes: t.Union[Path, t.Tuple[bytes, str]]
-    ) -> t.List[Blob]:
+    def add_multiple_by_writing(self, *args: t.Union[Path, t.Tuple[bytes, str]]) -> t.List[Blob]:
         """
         Add blobs to the blob cache
 
-        :param blobs: a list of paths and named bytes.
+        :param args: a sequence of paths and named bytes.
             Each element of list can be either a ``pathlib.Path`` object or
             a tuple of a ``bytes`` object and a file name string.
 
         :returns: a list of strings representing the blob digests
         """
-        if len(seq_paths_and_named_bytes) == 0:
+        if len(args) == 0:
             return []
 
         to_be_added: t.Dict[str, t.Tuple[str, t.Union[Path, bytes]]] = dict()
@@ -104,17 +101,13 @@ class BlobStore:
 
         idx_to_digest_mapping: t.Dict[int, str] = dict()
         try:
-            with ThreadPoolExecutor(
-                max_workers=min(8, len(seq_paths_and_named_bytes))
-            ) as executor:
-                for idx, digest in executor.map(
-                    _hash, range(len(seq_paths_and_named_bytes)), seq_paths_and_named_bytes
-                ):
+            with ThreadPoolExecutor(max_workers=min(8, len(args))) as executor:
+                for idx, digest in executor.map(_hash, range(len(args)), args):
                     idx_to_digest_mapping[idx] = digest
 
                 list_blob_dir, list_file_name, list_path_or_bytes = [], [], []
                 for digest, (file_name, path_or_bytes) in to_be_added.items():
-                    list_blob_dir.append(self._data_dir / digest)
+                    list_blob_dir.append(self._build_blob_dir_path(digest))
                     list_file_name.append(file_name)
                     list_path_or_bytes.append(path_or_bytes)
                 for _ in executor.map(
@@ -123,7 +116,7 @@ class BlobStore:
                     pass
         except BaseException as e:
             for digest in to_be_added.keys():
-                d = self._data_dir / digest
+                d = self._build_blob_dir_path(digest)
                 if d.exists():
                     shutil.rmtree(d)
 
@@ -142,7 +135,7 @@ class BlobStore:
         if self.check_if_contained(digest):
             return self.get_by_digest(digest)
         blob_dir = self._build_blob_dir_path(digest)
-        blob_dir.mkdir()
+        blob_dir.mkdir(parents=True)
         os.replace(path.resolve(), blob_dir / path.name)
         return Blob(digest=digest, file_path=path)
 
@@ -171,20 +164,21 @@ class BlobStore:
             self._lock.release_read_lock()
 
     def _build_blob_dir_path(self, digest: str) -> Path:
-        return self._data_dir / digest
+        return self.__data_dir / digest[:2] / digest
 
     def _sanitize(self) -> None:
         """
         Remove blobs whose directory is corrupted.
         """
-        dirs = self.list_digests()
+        digests = self.list_digests()
         to_be_removed = []
-        for d in dirs:
-            if len(list_files(self._data_dir / d)) == 0:
-                to_be_removed.append(str(self._data_dir / d))
-
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(shutil.rmtree, to_be_removed)
+        for digest in digests:
+            directory = self._build_blob_dir_path(digest)
+            if len(list_files(directory)) == 0:
+                to_be_removed.append(str(directory))
+        if to_be_removed:
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                executor.map(shutil.rmtree, to_be_removed)
 
 
 def _hash_bytes(bytes_: bytes) -> str:
@@ -204,17 +198,17 @@ def _hash_file(path: Path) -> str:
     return hash_.hexdigest()
 
 
-def _write_blob(blob_dir: Path, file_name: str, blob: t.Union[Path, bytes]):
-    blob_dir.mkdir()
+def _write_blob(blob_dir: Path, file_name: str, path_or_bytes: t.Union[Path, bytes]):
+    blob_dir.mkdir(parents=True)
     try:
         blob_file_path = blob_dir / file_name
         tmp_file_fd, tmp_file_path_str = tempfile.mkstemp()
         os.close(tmp_file_fd)
         tmp_file_path = Path(tmp_file_path_str)
-        if isinstance(blob, bytes):
-            tmp_file_path.write_bytes(blob)
+        if isinstance(path_or_bytes, bytes):
+            tmp_file_path.write_bytes(path_or_bytes)
         else:
-            shutil.copyfile(blob.resolve(), tmp_file_path)
+            shutil.copyfile(path_or_bytes.resolve(), tmp_file_path)
         os.replace(tmp_file_path, blob_file_path)
     except BaseException as e:
         shutil.rmtree(str(blob_dir))

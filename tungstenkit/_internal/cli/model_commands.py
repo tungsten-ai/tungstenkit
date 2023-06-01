@@ -217,6 +217,7 @@ def clear(repo_name: str, **kwargs):
 @model.command
 @click.argument("model_name", default="", callback=stored_model_name_callback)
 @click.option("--port", "-p", default=3000, type=int)
+@click.option("--batch-size", default=None, type=int, help="Max batch size for adaptive batching")
 @click.option(
     "--log-level",
     default="info",
@@ -226,7 +227,7 @@ def clear(repo_name: str, **kwargs):
     callback=lambda _, __, v: v.upper(),
 )
 @common_options
-def serve(model_name: str, port: int, log_level: str, **kwargs):
+def serve(model_name: str, port: int, batch_size: t.Optional[int], log_level: str, **kwargs):
     """
     Start a prediction service for a model
 
@@ -245,7 +246,9 @@ def serve(model_name: str, port: int, log_level: str, **kwargs):
     ]
     if model_data.gpu:
         args += ["--gpus", "all"]
-    args += [model_data.docker_image_id, "--http-port", f"{port}", "--log-level", log_level]
+    if batch_size:
+        args += ["--batch-size", str(batch_size)]
+    args += [model_data.docker_image_id, "--http-port", str(port), "--log-level", log_level]
     print(TUNGSTEN_LOGO)
     subprocess.run(args)
 
