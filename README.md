@@ -6,7 +6,7 @@
 
 [Installation](#prerequisites) | [Features](#features) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
 
-**Tungstenkit** is ML conterization tool with a focus on developer productivity and versatility. 
+**Tungstenkit** is ML containerization tool with a focus on developer productivity and versatility. 
 
 Have you ever struggled to use models from github?
 You may have repeated tedious steps like: cuda/dependency problems, file handling, and scripting for testing.
