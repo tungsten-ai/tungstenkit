@@ -161,8 +161,8 @@ Tungstenkit doesn't restrict you to use specific ML libraries. Just use any libr
 
 ```python
 # The latest cpu-only build of Tensorflow will be included
-@model_config(gpu=False, python_packages=["tensorflow"])
-class Model(TungstenModel[Input, Output]):
+@define_model(input=Input, output=Output, gpu=False, python_packages=["tensorflow"])
+class Model:
     def predict(self, inputs):
         """Run a batch prediction"""
         # ...ops using tensorflow...
