@@ -192,7 +192,7 @@ As you see, input/output types are defined as subclasses of the ``BaseIO`` class
 Also, you can see that the ``Image`` class is used. Tungstenkit provides four file classes for easing file handling - ``Image``, ``Audio``, ``Video``, and ``Binary``. They have useful methods for writing a model's ``predict`` method:
 
 ```python
-class StyleTransferModel(TungstenModel[Input, Output]):
+class StyleTransferModel:
     def predict(self, inputs: List[Input]) -> List[Output]:
         # Preprocessing
         input_pil_images = [inp.image.to_pil_image() for inp in inputs]
@@ -212,9 +212,7 @@ Tungstenkit supports both server-side and client-side batching.
     A server groups inputs across multiple requests and processes them together.
     You can configure the max batch size:
     ```python
-    @model_config(gpu=True, batch_size=32)
-    class Model(TungstenModel[Input, Output]):
-        ...
+    @define_model(input=Input, output=Output, gpu=True, batch_size=32)
     ```
     The max batch size can be changed when running a server:
     ```console
