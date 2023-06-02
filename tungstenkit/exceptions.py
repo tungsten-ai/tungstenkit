@@ -98,6 +98,10 @@ class InvalidOutput(TungstenException):
     pass
 
 
+class InvalidDemoOutput(TungstenException):
+    pass
+
+
 class PipPackageParseError(TungstenException):
     pass
 

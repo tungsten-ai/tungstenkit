@@ -12,8 +12,10 @@ from fastapi.encoders import jsonable_encoder
 
 from tungstenkit import exceptions
 from tungstenkit._internal.io import BaseIO, File
+from tungstenkit._internal.model_def import TungstenModel
 from tungstenkit._internal.model_def_loader import ModelDefLoader
 from tungstenkit._internal.utils.pydantic import run_validation
+from tungstenkit._internal.utils.types import get_qualname
 
 from .. import server_exceptions
 
@@ -51,7 +53,7 @@ class WorkerSubprocess(mp.Process):
         self._predict_log_path = predict_log_path
 
         self._is_running: bool = False
-        self._model: t.Optional[t.Any] = None
+        self._model: t.Optional[TungstenModel] = None
         self._input_cls: t.Optional[t.Type[BaseIO]] = None
         self._output_cls: t.Optional[t.Type[BaseIO]] = None
 
@@ -66,8 +68,9 @@ class WorkerSubprocess(mp.Process):
 
             self._model = self._model_def_loader.model
             self._model.setup()
-            self._input_cls = self._model.define_input()
-            self._output_cls = self._model.define_output()
+            self._input_cls = self._model_def_loader.input_class
+            self._output_cls = self._model_def_loader.output_class
+            self._demo_output_cls = self._model_def_loader.demo_output_class
             self._conn.send(None)
 
         with ExitStack() as exit_stack:
@@ -93,6 +96,7 @@ class WorkerSubprocess(mp.Process):
         assert self._model
         assert self._input_cls
         assert self._output_cls
+        assert self._demo_output_cls
 
         try:
             self._is_running = True
@@ -150,7 +154,9 @@ class WorkerSubprocess(mp.Process):
             files = _get_files([outputs, demo_outputs])
 
             validated_outputs = _validate_and_serialize_outputs(outputs, self._output_cls)
-            validated_demo_outputs = _validate_and_serialize_demo_outputs(demo_outputs)
+            validated_demo_outputs = _validate_and_serialize_demo_outputs(
+                demo_outputs, self._demo_output_cls
+            )
 
             self._is_running = False
             return PredictionSuccess(
@@ -199,18 +205,24 @@ def _get_files(outputs: t.Any) -> t.List[File]:
 
 def _validate_and_serialize_demo_outputs(
     demo_outputs: t.Iterable,
+    demo_output_cls: t.Type[BaseIO],
 ) -> t.List[t.Optional[t.Dict]]:
     validated_demo_outputs: t.List[t.Optional[t.Dict]] = []
     for o in demo_outputs:
-        if o is None:
-            validated_demo_outputs.append(o)
-        elif isinstance(o, BaseIO) or isinstance(o, dict):
-            validated_demo_outputs.append(jsonable_encoder(o))
-            # TODO validate
-        else:
-            raise exceptions.InvalidOutput(
-                f"Invalid demo output type: {type(o)}. " f"Allowed types: 'dict' and '{BaseIO}'"
-            )
+        try:
+            if o is None:
+                validated_demo_outputs.append(o)
+            elif isinstance(o, demo_output_cls):
+                validated_demo_outputs.append(jsonable_encoder(run_validation(o)))
+            elif isinstance(o, dict):
+                validated_demo_outputs.append(jsonable_encoder(demo_output_cls.parse_obj(o)))
+            else:
+                raise exceptions.InvalidDemoOutput(
+                    f"Invalid demo output type: {type(o)}. "
+                    f"Allowed types: 'dict' and '{BaseIO}'"
+                )
+        except pydantic.error_wrappers.ValidationError as e:
+            raise exceptions.InvalidDemoOutput(str(e))
 
     return validated_demo_outputs
 
@@ -227,12 +239,33 @@ def _validate_and_serialize_outputs(
                 validated_outputs.append(jsonable_encoder(output_cls.parse_obj(o)))
             else:
                 raise exceptions.InvalidOutput(
-                    f"Invalid output type: {type(o)}. Allowed types: 'dict' and '{output_cls}'"
+                    f"Invalid output type: {type(o)}. Allowed types: 'dict' and "
+                    f"'{get_qualname(output_cls)}'"
                 )
         except pydantic.error_wrappers.ValidationError as e:
             raise exceptions.InvalidOutput(str(e))
 
     return validated_outputs
+
+
+# def _validate_and_serialize_demo_outputs(
+#     outputs: t.Iterable, output_cls: t.Type[BaseIO]
+# ) -> t.List[t.Dict]:
+#     validated_outputs: t.List[t.Dict] = []
+#     for o in outputs:
+#         try:
+#             if isinstance(o, output_cls):
+#                 validated_outputs.append(jsonable_encoder(run_validation(o)))
+#             elif isinstance(o, dict):
+#                 validated_outputs.append(jsonable_encoder(output_cls.parse_obj(o)))
+#             else:
+#                 raise exceptions.InvalidDemoOutput(
+#                     f"Invalid output type: {type(o)}. Allowed types: 'dict' and '{output_cls}'"
+#                 )
+#         except pydantic.error_wrappers.ValidationError as e:
+#             raise exceptions.InvalidDemoOutput(str(e))
+
+#     return validated_outputs
 
 
 def _redirect_stream(exit_stack: ExitStack, path: Path, flush: bool = True):
