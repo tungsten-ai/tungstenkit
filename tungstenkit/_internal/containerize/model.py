@@ -29,6 +29,7 @@ def build_model(
         model_loader = create_model_def_loader(module_ref, class_name, lazy_import=True)
         input_schema = model_loader.input_class.schema()
         output_schema = model_loader.output_class.schema()
+        demo_output_schema = model_loader.demo_output_class.schema()
         model_config = model_loader.config
         model_class = model_loader.model_class
         if copy_files is not None:
@@ -56,11 +57,13 @@ def build_model(
             build_ctx.build(tags=tags)
 
             # Add to the local store
-            io_schema = storables.IOSchemaData(
-                input_jsonschema=input_schema,
-                output_jsonschema=output_schema,
+            io_schema = storables.ModelIOData(
+                input_schema=input_schema,
+                output_schema=output_schema,
+                demo_output_schema=demo_output_schema,
                 input_filetypes=model_config.input_filetypes,
                 output_filetypes=model_config.output_filetypes,
+                demo_output_filetypes=model_config.demo_output_filetypes,
             )
             avatar = storables.AvatarData.fetch_default(hash_key=model_name)
             if model_config.readme_md:

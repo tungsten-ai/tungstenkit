@@ -2,10 +2,11 @@ import time
 import typing as t
 from pathlib import Path
 
-from tungstenkit import BaseIO, Field, Image, Option, TungstenModel, model_config
+from tungstenkit import BaseIO, Field, Image, Option, define_model
 
 BUILD_DIR = Path(__file__).parent
 README_PATH = BUILD_DIR / "bin" / "markdown.md"
+INCLUDE_FILES = ["./dummy_model.py", "./bin"]
 
 
 class DummyInput(BaseIO):
@@ -21,12 +22,14 @@ class DummyOutput(BaseIO):
     output: str
 
 
-@model_config(
+@define_model(
+    input=DummyInput,
+    output=DummyOutput,
     batch_size=4,
     readme_md=str(README_PATH),
-    include_files=["./dummy_model.py", "./bin"],
+    include_files=INCLUDE_FILES,
 )
-class DummyModel(TungstenModel[DummyInput, DummyOutput]):
+class DummyModel:
     failure: bool = False
 
     def setup(self):

@@ -24,6 +24,8 @@ class Metadata(BaseModel):
     description: str
     input_schema: t.Dict
     output_schema: t.Dict
+    input_filetypes: t.Dict
+    output_filetypes: t.Dict
     avatar_url: str
     examples_count: int
     readme: t.Optional[str] = None
@@ -33,12 +35,12 @@ class Metadata(BaseModel):
         global _input_schema, _output_schema, _readme, _avatar_filename
         # Load schemas
         _input_schema = (
-            json.loads(model.io_schema.input_jsonschema.file_path.read_text())
+            json.loads(model.io.input_schema.file_path.read_text())
             if _input_schema is None
             else _input_schema
         )
         _output_schema = (
-            json.loads(model.io_schema.output_jsonschema.file_path.read_text())
+            json.loads(model.io.output_schema.file_path.read_text())
             if _output_schema is None
             else _output_schema
         )

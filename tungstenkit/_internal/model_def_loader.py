@@ -45,18 +45,27 @@ class ModelDefLoader(abc.ABC):
 
     @property
     def input_class(self) -> t.Type[io.BaseIO]:
-        return self.model.define_input()
+        return self.model.__tungsten_input__
 
     @property
     def output_class(self) -> t.Type[io.BaseIO]:
-        return self.model.define_output()
+        return self.model.__tungsten_output__
+
+    @property
+    def demo_output_class(self) -> t.Type[io.BaseIO]:
+        return self.model.__tungsten_demo_output__
 
     @property
     def config(self) -> ModelConfig:
         try:
-            config = ModelConfig.with_types(
-                input_cls=self.input_class, output_cls=self.output_class
-            )(**self.model_class.__tungsten_config__)
+            config_dict = {
+                k: v for k, v in self.model_class.__tungsten_config__.items() if v is not None
+            }
+            c = ModelConfig.with_types(
+                input_cls=self.input_class,
+                output_cls=self.output_class,
+                demo_output_cls=self.demo_output_class,
+            )(**config_dict)
         except pydantic.ValidationError as e:
             raise exceptions.ModelConfigError(
                 str(e).replace(
@@ -66,9 +75,9 @@ class ModelDefLoader(abc.ABC):
                 )
             )
 
-        config.environment_variables["TUNGSTEN_MODEL_MODULE"] = self.model_class.__module__
-        config.environment_variables["TUNGSTEN_MODEL_CLASS"] = self.model_class.__name__
-        return config
+        c.environment_variables["TUNGSTEN_MODEL_MODULE"] = self.model_class.__module__
+        c.environment_variables["TUNGSTEN_MODEL_CLASS"] = self.model_class.__name__
+        return c
 
     @abc.abstractmethod
     def _load(self):

@@ -6,7 +6,6 @@ from pydantic.fields import FieldInfo
 from tungstenkit._internal import io
 from tungstenkit._internal.utils.string import camel_to_snake
 from tungstenkit._internal.utils.types import get_type_args, get_type_origin
-from tungstenkit.exceptions import TungstenModelError
 
 SUPPORTED_INPUT_TYPES: t.List[t.Type] = [
     int,
@@ -33,7 +32,7 @@ def build_field_type_err_msg(invalid_fields: t.Dict[str, t.Type]):
 
 def validate_input_class(input_cls: t.Type):
     if not issubclass(input_cls, io.BaseIO):
-        raise TungstenModelError(f"Input type {input_cls} is not a subclass of {io.BaseIO}")
+        raise TypeError(f"Input type {input_cls} is not a subclass of {io.BaseIO}")
 
     invalid_types: t.Dict[str, t.Type] = dict()
     type_hints = t.get_type_hints(input_cls)
@@ -61,7 +60,7 @@ def validate_input_class(input_cls: t.Type):
                 for type_ in SUPPORTED_INPUT_TYPES
             ]
         )
-        raise TungstenModelError(err_msg)
+        raise TypeError(err_msg)
 
     # Set the default description on input fields if not set
     updated_fields: t.Dict[str, t.Tuple[t.Type, FieldInfo]] = dict()
@@ -83,7 +82,7 @@ def validate_input_class(input_cls: t.Type):
 
 def validate_output_class(output_cls: t.Type):
     if not issubclass(output_cls, io.BaseIO):
-        raise TungstenModelError(f"Output type '{output_cls}' is not a subclass of '{io.BaseIO}'")
+        raise TypeError(f"Output type '{output_cls}' is not a subclass of '{io.BaseIO}'")
 
     invalid_types_and_reasons: t.Dict[str, t.Tuple[t.Type, str]] = dict()
 
@@ -153,9 +152,12 @@ def validate_output_class(output_cls: t.Type):
             err_msg += "Supported types for dict keys: " ", ".join(
                 [f"'{type_.__name__}'" for type_ in SUPPORTED_DICT_KEY_TYPES]
             )
-        raise TungstenModelError(err_msg)
+        raise TypeError(err_msg)
 
     return output_cls
+
+
+validate_demo_output_class = validate_output_class
 
 
 def get_filetypes(io_cls: t.Type[io.BaseIO]) -> t.Dict[str, io.FileType]:

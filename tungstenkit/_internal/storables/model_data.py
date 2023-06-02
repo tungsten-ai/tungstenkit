@@ -7,9 +7,9 @@ from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePoli
 from tungstenkit._internal.json_store import JSONItem, JSONStorable
 from tungstenkit._internal.utils.docker import get_docker_client, parse_docker_image_name
 
-from .avatar_data import AvatarData, StoredAvatarData
-from .io_schema_data import IOSchemaData, StoredIOSchema
+from .avatar_data import AvatarData, StoredAvatar
 from .markdown_data import MarkdownData, StoredMarkdown
+from .model_io_data import ModelIOData, StoredModelIOData
 from .pred_example_data import PredExampleData, StoredPredExampleData
 from .source_file_data import SerializedSourceFileCollection, SourceFile, SourceFileCollection
 
@@ -80,8 +80,8 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     repo_name: str
     tag: str
 
-    io_schema: StoredIOSchema
-    avatar: StoredAvatarData
+    io: StoredModelIOData
+    avatar: StoredAvatar
     readme: t.Optional[StoredMarkdown] = None
     examples: t.Dict[str, StoredPredExampleData] = attrs.field(factory=dict)
     source_files: t.Optional[SerializedSourceFileCollection] = None
@@ -96,8 +96,7 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     def blobs(self) -> t.Set[Blob]:
         blob_set: t.Set[Blob] = set()
 
-        blob_set.add(self.io_schema.input_jsonschema)
-        blob_set.add(self.io_schema.output_jsonschema)
+        blob_set.add(self.io.blob)
 
         blob_set.add(self.avatar.blob)
 
@@ -137,7 +136,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
     repo_name: str
     tag: str
 
-    io_schema: IOSchemaData
+    io: ModelIOData
     avatar: AvatarData
     readme: t.Optional[MarkdownData] = None
     examples: t.List[PredExampleData] = attrs.field(factory=list)
@@ -149,7 +148,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         self,
         *,
         name: str,
-        io_schema: IOSchemaData,
+        io_schema: ModelIOData,
         avatar: AvatarData,
         readme: t.Optional[MarkdownData] = None,
         examples: t.Optional[t.List[PredExampleData]] = None,
@@ -163,7 +162,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         tag = self.id if _tag is None else _tag
         self.tag = tag
 
-        self.io_schema = io_schema
+        self.io = io_schema
         self.avatar = avatar
         self.readme = readme
         self.examples = examples if examples else []
@@ -198,7 +197,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         else:
             stored_readme = None
 
-        stored_schema = self.io_schema.save_blobs(
+        stored_schema = self.io.save_blobs(
             blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
         )
 
@@ -229,7 +228,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             repo_name=self.repo_name,
             tag=self.tag,
             readme=stored_readme,
-            io_schema=stored_schema,
+            io=stored_schema,
             avatar=stored_avatar,
             examples=stored_examples,
             source_files=stored_source_files,
@@ -248,7 +247,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         return ModelData(
             name=data.name,
             created_at=data.created_at,
-            io_schema=IOSchemaData.load_blobs(data.io_schema),
+            io_schema=ModelIOData.load_blobs(data.io),
             avatar=AvatarData.load_blobs(data.avatar),
             readme=MarkdownData.load_blobs(data.readme) if data.readme else None,
             examples=[PredExampleData.load_blobs(e) for e in data.examples.values()]

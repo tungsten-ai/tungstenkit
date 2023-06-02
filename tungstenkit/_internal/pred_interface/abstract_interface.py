@@ -104,7 +104,7 @@ class PredInterface(abc.ABC):
         ``io.BufferedIOBase``, ``io.TextIOBase``
         """
         ret = input.copy()
-        input_filetypes = self._data.io_schema.input_filetypes
+        input_filetypes = self._data.io.input_filetypes
         for field_name in input_filetypes.keys():
             if field_name in ret:
                 ret[field_name] = build_uri_for_file(input[field_name])

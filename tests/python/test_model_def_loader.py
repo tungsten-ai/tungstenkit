@@ -15,8 +15,19 @@ def test_model_module_loader():
     assert loader.input_class == dummy_model.DummyInput
     assert loader.output_class == dummy_model.DummyOutput
     config = ModelConfig.with_types(
-        input_cls=dummy_model.DummyInput, output_cls=dummy_model.DummyOutput
-    )(**dummy_model.DummyModel.__tungsten_config__)
+        input_cls=dummy_model.DummyInput,
+        output_cls=dummy_model.DummyOutput,
+        demo_output_cls=dummy_model.DummyOutput,
+    )(
+        batch_size=4,
+        readme_md=str(dummy_model.README_PATH),
+        include_files=dummy_model.INCLUDE_FILES,
+    )
+    config = ModelConfig.with_types(
+        input_cls=dummy_model.DummyInput,
+        output_cls=dummy_model.DummyOutput,
+        demo_output_cls=dummy_model.DummyOutput,
+    )(**{k: v for k, v in dummy_model.DummyModel.__tungsten_config__.items() if v is not None})
     config.environment_variables["TUNGSTEN_MODEL_MODULE"] = dummy_model.__name__
     config.environment_variables["TUNGSTEN_MODEL_CLASS"] = dummy_model.DummyModel.__name__
 

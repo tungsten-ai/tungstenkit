@@ -93,20 +93,27 @@ class ModelConfig(BuildConfig):
     readme_md: t.Optional[Path] = None
     input_schema: t.Dict
     output_schema: t.Dict
+    demo_output_schema: t.Dict
     input_filetypes: t.Dict[str, FileType]
     output_filetypes: t.Dict[str, FileType]
+    demo_output_filetypes: t.Dict[str, FileType]
 
     @classmethod
-    def with_types(cls, input_cls: t.Type[BaseIO], output_cls: t.Type[BaseIO]):
+    def with_types(
+        cls, input_cls: t.Type[BaseIO], output_cls: t.Type[BaseIO], demo_output_cls: t.Type[BaseIO]
+    ):
         input_filetypes = get_filetypes(input_cls)
         output_filetypes = get_filetypes(output_cls)
+        demo_output_filetypes = get_filetypes(demo_output_cls)
         return create_model(
             cls.__name__,
             __base__=cls,
             input_schema=(t.Dict, Field(default_factory=input_cls.schema)),
             output_schema=(t.Dict, Field(default_factory=output_cls.schema)),
+            demo_output_schema=(t.Dict, Field(default_factory=demo_output_cls.schema)),
             input_filetypes=(t.Dict, Field(default=input_filetypes)),
             output_filetypes=(t.Dict, Field(default=output_filetypes)),
+            demo_output_filetypes=(t.Dict, Field(default=demo_output_filetypes)),
         )
 
     @validator("readme_md")

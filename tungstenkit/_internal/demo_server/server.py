@@ -1,6 +1,5 @@
 import json
 import signal
-import typing as t
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
@@ -15,7 +14,7 @@ from tungstenkit._internal.model_clients import ModelContainerClient
 from tungstenkit._internal.storables import StoredModelData
 
 from . import schemas
-from .services import ExampleService, FileService, PredictionService
+from .services import FileService, PredictionService
 
 frontend_dir_in_pkg = Path(__file__).parent / "frontend"
 
@@ -61,14 +60,7 @@ def _add_api_endpoints(
     prediction_service = PredictionService(
         file_service=file_service,
         model_client=model_client,
-        input_schema=json.loads(
-            stored_model_data.io_schema.input_jsonschema.file_path.read_bytes()
-        ),
-    )
-    example_service = ExampleService(
-        model_name=stored_model_data.name,
-        file_service=file_service,
-        prediction_service=prediction_service,
+        input_schema=json.loads(stored_model_data.io.input_schema.file_path.read_bytes()),
     )
 
     # Start garbage collection
@@ -101,26 +93,9 @@ def _add_api_endpoints(
     def get_prediction(prediction_id: str, req: Request):
         return prediction_service.get_prediction_by_id(prediction_id=prediction_id, request=req)
 
-    @app.post("/predictions/{prediction_id}/save", response_model=schemas.PostExampleResponse)
-    def save_prediction_as_example(prediction_id: str, req: Request):
-        pred = prediction_service.get_prediction_by_id(prediction_id, request=req)
-        if pred.status != "success":
-            raise HTTPException(status_code=422, detail="Not a succeeded prediction")
-
-        example_id = example_service.add_example_by_prediction_id(prediction_id)
-        return schemas.PostExampleResponse(example_id=example_id)
-
     @app.post("/predictions/{prediction_id}/cancel")
     def cancel_prediction(prediction_id: str):
         prediction_service.cancel_prediction_by_id(prediction_id)
-
-    @app.get("/examples", response_model=t.List[schemas.Example])
-    def list_examples(req: Request):
-        return example_service.list_examples(req)
-
-    @app.delete("/examples/{example_id}")
-    def delete_example(example_id: str):
-        example_service.delete_by_example_id(example_id)
 
     @app.post("/files", response_model=schemas.FileUploadResponse)
     def upload_file(file: UploadFile, req: Request):
@@ -137,7 +112,7 @@ def _add_api_endpoints(
         dependencies=[Depends(file_service.acquire_read_lock)],
         name="files",
     )
-    def get_file(filename: str):
+    def download_file(filename: str):
         if not file_service.check_existence(filename, strict=True):
             raise HTTPException(status_code=404, detail=filename)
         path = file_service.get_path_by_filename(filename).resolve()

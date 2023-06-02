@@ -5,7 +5,7 @@ from tungstenkit._internal.utils.avatar import fetch_default_avatar_png
 
 
 @attrs.frozen(kw_only=True)
-class StoredAvatarData:
+class StoredAvatar:
     blob: Blob
 
     @property
@@ -14,7 +14,7 @@ class StoredAvatarData:
 
 
 @attrs.define(kw_only=True)
-class AvatarData(BlobStorable[StoredAvatarData]):
+class AvatarData(BlobStorable[StoredAvatar]):
     bytes_: bytes
     extension: str
 
@@ -27,12 +27,12 @@ class AvatarData(BlobStorable[StoredAvatarData]):
         self,
         blob_store: BlobStore,
         file_blob_create_policy: FileBlobCreatePolicy = "copy",
-    ) -> StoredAvatarData:
+    ) -> StoredAvatar:
         blob = blob_store.add_by_writing((self.bytes_, "avatar" + self.extension))
-        return StoredAvatarData(blob=blob)
+        return StoredAvatar(blob=blob)
 
     @classmethod
-    def load_blobs(cls, data: StoredAvatarData) -> "AvatarData":
+    def load_blobs(cls, data: StoredAvatar) -> "AvatarData":
         return AvatarData(
             bytes_=data.blob.file_path.read_bytes(),
             extension=data.extension,

@@ -9,8 +9,7 @@ import uvicorn
 from fastapi.encoders import jsonable_encoder
 from tabulate import tabulate
 
-from tungstenkit import exceptions
-from tungstenkit._internal import model_store, storables
+from tungstenkit._internal import model_store
 from tungstenkit._internal.constants import (
     DEFAULT_MODEL_MODULE,
     TUNGSTEN_DIR_IN_CONTAINER,
@@ -20,7 +19,7 @@ from tungstenkit._internal.containerize import build_model
 from tungstenkit._internal.containers import start_model_container
 from tungstenkit._internal.demo_server import create_demo_app
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
-from tungstenkit._internal.utils import docker, regex
+from tungstenkit._internal.utils import docker
 
 # from tungstenkit._internal.tungsten_clients import TungstenClient
 from tungstenkit._internal.utils.console import print_pretty, print_success, yes_or_no_prompt
@@ -317,69 +316,6 @@ def extract(model_name: str, save_dir: str, **kwargs):
     docker.copy_from_image(
         model_data.id, TUNGSTEN_DIR_IN_CONTAINER, Path(save_dir), image_desc=model_data.name
     )
-
-
-# TODO support tarball url
-@model.command
-@click.argument("model_name", default="", callback=stored_model_name_callback)
-@click.option(
-    "--output",
-    "-o",
-    default=None,
-    type=click.Path(exists=False),
-    help="Path to the output tar archive",
-)
-def export(model_name: str, output: t.Optional[str]):
-    """
-    Export a model as a tar archive
-
-    'MODEL_NAME' should be in the '<repo name>[:<tag>]' format
-    """
-    model_data = model_store.get(model_name)
-    if output is None:
-        output_path = Path(".") / (model_data.short_name + ".tar")
-    else:
-        output_path = Path(output)
-    docker.export_image_to_file(
-        model_data.docker_image_id, output_path, image_desc=model_data.name
-    )
-
-
-# TODO support tarball url
-@model.command
-@click.argument("tar_file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
-@click.option(
-    "--name",
-    "-n",
-    default=None,
-    type=str,
-    help="Name of the imported model in '<repo name>[:<tag>]' format",
-    callback=model_name_validator,
-)
-def import_image(tar_file: str, name: t.Optional[str]):
-    """
-    Import a model from a tar archive
-    """
-    tar_path = Path(tar_file)
-
-    if name is None:
-        name = tar_path.name.split(".")[0]
-        try:
-            regex.validate_docker_image_name(name)
-        except exceptions.InvalidName:
-            name = "imported-model"
-
-    repo, tag = docker.parse_docker_image_name(name)
-    id = storables.ModelData.generate_id()
-    if not tag:
-        tag = id
-    name = repo + ":" + tag
-
-    docker.import_image_from_file(tar_path, name)
-    avatar = storables.AvatarData.fetch_default(name)
-    # TODO warning if version mismatched
-
-    # TODO complete this
 
 
 # @model.command()

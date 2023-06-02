@@ -14,8 +14,8 @@ def test_get_model_metadata(demo_server_base_url: str, dummy_model_data: storabl
     resp.raise_for_status()
     parsed = schemas.Metadata.parse_raw(resp.text)
     assert parsed.description == dummy_model_data.description
-    assert parsed.input_schema == dummy_model_data.io_schema.input_jsonschema
-    assert parsed.output_schema == dummy_model_data.io_schema.output_jsonschema
+    assert parsed.input_schema == dummy_model_data.io.input_schema
+    assert parsed.output_schema == dummy_model_data.io.output_schema
     assert parsed.name == dummy_model_data.name
 
 
