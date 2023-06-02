@@ -65,7 +65,7 @@ class Output(BaseIO):
     gpu=True,
     python_packages=["torch", "torchvision"],
     batch_size=4,
-    gpu_mem_gb=16,
+    gpu_mem_gb=24,
 )
 class TextToImageModel:
     def setup(self):
