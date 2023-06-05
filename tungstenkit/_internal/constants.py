@@ -41,6 +41,10 @@ DATA_DIR = Path(os.getenv("TUNGSTEN_DATA_DIR", Path(appdirs.user_data_dir)))
 DATA_DIR = DATA_DIR.resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+CONFIG_DIR = Path(os.getenv("TUNGSTEN_CONFIG_DIR", Path(appdirs.user_config_dir)))
+CONFIG_DIR = CONFIG_DIR.resolve()
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
 LOCK_DIR = Path(tempfile.gettempdir()) / "tungsten" / "locks"
 LOCK_DIR.mkdir(parents=True, exist_ok=True)
 

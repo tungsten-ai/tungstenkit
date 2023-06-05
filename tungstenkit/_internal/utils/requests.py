@@ -4,6 +4,7 @@ import typing as t
 from collections.abc import MutableMapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import ExitStack
+from itertools import combinations
 from pathlib import Path
 
 import requests
@@ -164,7 +165,6 @@ def upload_form_data_by_buffer(
     progress_bar: bool = False,
     desc: t.Optional[str] = None,
 ) -> requests.Response:
-
     with ExitStack() as exit_stack:
         create_callback = None
         if progress_bar:
@@ -196,7 +196,7 @@ def upload_form_data_by_buffer(
 
 def download_files_in_threadpool(
     *urls: str,
-    download_dir: Path,
+    out: t.Union[Path, t.List[Path]],
     sess: t.Optional[requests.Session] = None,
     headers: t.Optional[t.Dict[str, str]] = None,
     progress_bar: bool = False,
@@ -208,12 +208,27 @@ def download_files_in_threadpool(
     unique_urls = list(set(urls))
     unique_url_indices = [unique_urls.index(url) for url in urls]
     download_paths: t.List[Path] = []
-    for filename in [get_filename_from_uri(url) for url in unique_urls]:
-        filepath = download_dir / filename
-        if filepath.exists():
-            filepath = convert_to_unique_path(filepath)
-        filepath.touch()
-        download_paths.append(filepath)
+
+    if isinstance(out, Path):
+        # Download all files in out_path
+        if out.exists() and not out.is_dir():
+            raise ValueError(f"Not a directory: {out}")
+        out.mkdir(exist_ok=True, parents=True)
+        for filename in [get_filename_from_uri(url) for url in unique_urls]:
+            filepath = out / filename
+            if filepath.exists():
+                filepath = convert_to_unique_path(filepath)
+            filepath.touch()
+            download_paths.append(filepath)
+    else:
+        if len(download_paths) != len(urls):
+            raise ValueError("# urls != # download paths")
+        path_pairs = combinations(out, 2)
+        for p1, p2 in path_pairs:
+            if p1 == p2:
+                raise ValueError(f"Path duplication: {p1}")
+
+        download_paths.extend(out)
 
     with ExitStack() as exit_stack:
         if progress_bar:

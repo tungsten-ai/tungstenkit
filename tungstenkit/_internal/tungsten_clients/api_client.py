@@ -1,7 +1,7 @@
 import io
 import typing as t
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import requests
 from furl import furl
@@ -197,18 +197,6 @@ class TungstenAPIClient:
 
         return responses
 
-    def get_model_file_tree(
-        self, project: str, version: str, path: t.Optional[str] = None
-    ) -> schemas.FileTree:
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "tree"
-        if path:
-            f.args["path"] = path
-        log_request(url=f.url, method="GET")
-        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(resp, f.url, f"Failed to list files of model {project}:{version}")
-        return schemas.FileTree.parse_raw(resp.text)
-
     def update_model_readme(
         self, project: str, version: str, readme: storables.MarkdownData
     ) -> None:
@@ -231,28 +219,6 @@ class TungstenAPIClient:
             resp, url=f.url, err_msg_prefix=f"Failed to upload README of model {project}:{version}"
         )
 
-    def get_model_source_tree(self, project: str, version: str) -> schemas.SourceTreeFolder:
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "tree"
-        log_request(url=f.url, method="GET")
-        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(
-            resp,
-            url=f.url,
-            err_msg_prefix=f"Failed to get the source tree of model {project}:{version}",
-        )
-        parsed = schemas.SourceTreeFolder.parse_raw(resp.text)
-        return parsed
-
-    def download_model_source_file(
-        self, project: str, version: str, path: str, download_dir: Path
-    ) -> Path:
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "files"
-        f.path.segments += [path]  # For url encoding
-        log_request(url=f.url, method="GET")
-        return download_file(url=f.url, out_path=download_dir, sess=self.sess)
-
     def get_model_readme(
         self, project: str, version: str, image_download_dir: Path
     ) -> storables.MarkdownData:
@@ -267,7 +233,7 @@ class TungstenAPIClient:
         if len(image_http_links) > 0:
             downloaded = self.download_multiple_files(
                 image_http_links,
-                download_dir=image_download_dir,
+                out=image_download_dir,
                 desc="Downloading images in README",
             )
             md = change_img_links_in_markdown(
@@ -275,6 +241,70 @@ class TungstenAPIClient:
             )
             return storables.MarkdownData(content=md, image_files=downloaded)
         return storables.MarkdownData(content=md)
+
+    def get_model_source_tree(self, project: str, version: str) -> schemas.SourceTreeFolder:
+        f = furl(self.base_url)
+        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "tree"
+        log_request(url=f.url, method="GET")
+        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
+        _check_resp(
+            resp,
+            url=f.url,
+            err_msg_prefix=f"Failed to get the source tree of model {project}:{version}",
+        )
+        parsed = schemas.SourceTreeFolder.parse_raw(resp.text)
+        return parsed
+
+    def download_model_source_file(
+        self, project: str, version: str, path: str, root_dir: Path
+    ) -> Path:
+        download_dir = (root_dir / path).parent
+        download_dir.mkdir(exist_ok=True, parents=True)
+
+        f = furl(self.base_url)
+        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "files"
+        f.path.segments += [path]  # For url encoding
+        log_request(url=f.url, method="GET")
+        return download_file(url=f.url, out_path=download_dir, sess=self.sess)
+
+    def download_model_source_tree(
+        self, project: str, version: str, root_dir: Path
+    ) -> t.List[storables.SourceFile]:
+        root = self.get_model_source_tree(project=project, version=version)
+        urls: t.List[str] = []
+        download_paths: t.List[Path] = []
+        ret: t.List[storables.SourceFile] = []
+
+        def _add(path: t.Optional[PurePosixPath], folder: schemas.SourceTreeFolder):
+            while True:
+                contents = folder.contents
+                for c in contents:
+                    p = path / c.name if path else PurePosixPath(c.name)
+                    if c.type == "folder":
+                        _add(p, c)
+                    else:
+                        if c.skipped:
+                            downloaded = None
+                        else:
+                            if path is None:
+                                downloaded = root_dir / c.name
+                            else:
+                                downloaded = root_dir / path / c.name
+
+                            urls.append(self._build_source_file_url(project, version, str(p)))
+                            download_paths.append(downloaded)
+
+                        ret.append(
+                            storables.SourceFile(
+                                rel_path_in_model_fs=p,
+                                abs_path_in_host_fs=downloaded,
+                                size=c.size,
+                            )
+                        )
+
+        _add(None, root)
+        self.download_multiple_files(urls, download_paths)
+        return ret
 
     def list_examples(
         self, project: str, version: str, file_download_dir: Path
@@ -446,12 +476,12 @@ class TungstenAPIClient:
     def download_multiple_files(
         self,
         urls: t.List[str],
-        download_dir: Path,
+        out: t.Union[Path, t.List[Path]],
         progress_bar: bool = True,
         desc: t.Optional[str] = None,
     ) -> t.List[Path]:
         return download_files_in_threadpool(
-            *urls, download_dir=download_dir, sess=self.sess, progress_bar=progress_bar, desc=desc
+            *urls, out=out, sess=self.sess, progress_bar=progress_bar, desc=desc
         )
 
     def build_upload_url(self, project: str) -> str:
@@ -461,6 +491,12 @@ class TungstenAPIClient:
 
     def _set_auth_header(self, access_token: str):
         self.sess.headers.update(Authorization="Bearer " + access_token)
+
+    def _build_source_file_url(self, project: str, version: str, path: str) -> str:
+        f = furl(self.base_url)
+        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "files"
+        f.path.segments += [path]  # For url encoding
+        return f.url
 
 
 def _check_resp(resp: requests.Response, url: str, err_msg_prefix: t.Optional[str] = None):

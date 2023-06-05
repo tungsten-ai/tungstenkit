@@ -8,7 +8,7 @@ from packaging.version import Version
 from pydantic import AnyHttpUrl, BaseModel, Field, create_model, validator
 
 from tungstenkit._internal.constants import (
-    DATA_DIR,
+    CONFIG_DIR,
     LOCK_DIR,
     MAX_SUPPORTED_PYTHON_VER,
     MIN_SUPPORTED_PYTHON_VER,
@@ -17,7 +17,7 @@ from tungstenkit._internal.io import BaseIO, FileType
 from tungstenkit._internal.io_schema import get_filetypes
 from tungstenkit.exceptions import NotLoggedIn
 
-CONFIG_PATH = DATA_DIR / "config.json"
+CONFIG_PATH = CONFIG_DIR / "config.json"
 CONFIG_LOCK_PATH = LOCK_DIR / "config.json.lock"
 
 

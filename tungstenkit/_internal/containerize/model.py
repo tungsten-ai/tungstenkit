@@ -78,6 +78,6 @@ def build_model(
             else:
                 readme = None
             model_data = storables.ModelData(
-                name=model_name, io_schema=io_schema, avatar=avatar, readme=readme, id=id
+                name=model_name, io_data=io_schema, avatar=avatar, readme=readme, id=id
             )
             return model_data.save()

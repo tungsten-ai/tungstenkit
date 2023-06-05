@@ -17,15 +17,16 @@ from tungstenkit._internal.constants import (
 from tungstenkit._internal.containerize import build_model
 from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
+from tungstenkit._internal.tungsten_clients import TungstenClient
 from tungstenkit._internal.utils import docker
-
-# from tungstenkit._internal.tungsten_clients import TungstenClient
 from tungstenkit._internal.utils.console import print_pretty, print_success, yes_or_no_prompt
 from tungstenkit._internal.utils.string import removeprefix
 
-from .callbacks import (  # project_name_callback,; remote_model_name_callback,
+from .callbacks import (
     input_fields_callback,
     model_name_validator,
+    project_name_callback,
+    remote_model_name_callback,
     stored_model_name_callback,
 )
 from .options import common_options
@@ -309,38 +310,38 @@ def extract(model_name: str, save_dir: str, **kwargs):
     )
 
 
-# @model.command()
-# @click.argument("project", callback=project_name_callback)
-# @click.option(
-#     "--model-name",
-#     "-n",
-#     help="Name of the model in '<repo name>[:<tag>]' format",
-#     callback=stored_model_name_callback,
-# )
-# @common_options
-# def push(project: str, model_name: str, **kwargs):
-#     """
-#     Push a model
+@model.command()
+@click.argument("project", callback=project_name_callback)
+@click.option(
+    "--model-name",
+    "-n",
+    help="Name of the model in '<repo name>[:<tag>]' format",
+    callback=stored_model_name_callback,
+)
+@common_options
+def push(project: str, model_name: str, **kwargs):
+    """
+    Push a model
 
-#     'PROJECT' should be in the '<namespace slug>/<project slug>' format
-#     """
-#     # TODO validate project
-#     # TODO print the pushed model in server
-#     tungsten_client = TungstenClient.from_env()
-#     print(TUNGSTEN_LOGO)
-#     tungsten_client.push_model(model_name=model_name, project=project)
+    'PROJECT' should be in the '<namespace>/<project>' format
+    """
+    # TODO validate project
+    # TODO print the pushed model in server
+    tungsten_client = TungstenClient.from_env()
+    print(TUNGSTEN_LOGO)
+    tungsten_client.push_model(model_name=model_name, project=project)
 
 
-# @model.command()
-# @click.argument("remote_model", callback=remote_model_name_callback)
-# @common_options
-# def pull(remote_model: str, **kwargs):
-#     """
-#     Pull a model
+@model.command()
+@click.argument("remote_model", callback=remote_model_name_callback)
+@common_options
+def pull(remote_model: str, **kwargs):
+    """
+    Pull a model
 
-#     'REMOTE_MODEL' should be in the '<repo name>[:<tag>]' format
-#     """
-#     project, version = remote_model.split(":", maxsplit=1)
-#     tungsten_client = TungstenClient.from_env()
-#     print(TUNGSTEN_LOGO)
-#     tungsten_client.pull_model(project=project, model_version=version)
+    'REMOTE_MODEL' should be in the '<namespace>/<project>[:<version>]' format
+    """
+    project, version = remote_model.split(":", maxsplit=1)
+    tungsten_client = TungstenClient.from_env()
+    print(TUNGSTEN_LOGO)
+    tungsten_client.pull_model(project=project, model_version=version)

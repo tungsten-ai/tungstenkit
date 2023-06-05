@@ -60,7 +60,7 @@ class MarkdownData(BlobStorable[StoredMarkdown]):
 
 def _download_remote_images_in_readme(save_dir: Path, markdown_content: str) -> str:
     to_be_downloaded = get_image_links(md=markdown_content, schemes=["http", "https"])
-    downloaded = download_files_in_threadpool(*to_be_downloaded, download_dir=save_dir)
+    downloaded = download_files_in_threadpool(*to_be_downloaded, out=save_dir)
     return change_img_links_in_markdown(
         md=markdown_content, images=to_be_downloaded, updates=[str(p) for p in downloaded]
     )

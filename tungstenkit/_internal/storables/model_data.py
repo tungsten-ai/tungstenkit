@@ -148,7 +148,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         self,
         *,
         name: str,
-        io_schema: ModelIOData,
+        io_data: ModelIOData,
         avatar: AvatarData,
         readme: t.Optional[MarkdownData] = None,
         examples: t.Optional[t.List[PredExampleData]] = None,
@@ -162,7 +162,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         tag = self.id if _tag is None else _tag
         self.tag = tag
 
-        self.io = io_schema
+        self.io = io_data
         self.avatar = avatar
         self.readme = readme
         self.examples = examples if examples else []
@@ -247,7 +247,7 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         return ModelData(
             name=data.name,
             created_at=data.created_at,
-            io_schema=ModelIOData.load_blobs(data.io),
+            io_data=ModelIOData.load_blobs(data.io),
             avatar=AvatarData.load_blobs(data.avatar),
             readme=MarkdownData.load_blobs(data.readme) if data.readme else None,
             examples=[PredExampleData.load_blobs(e) for e in data.examples.values()]

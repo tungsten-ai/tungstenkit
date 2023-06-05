@@ -143,6 +143,4 @@ class PredInterface(abc.ABC):
         return outputs
 
     def _download_multiple_files(self, http_urls: t.List[str], download_dir: Path):
-        return download_files_in_threadpool(
-            *http_urls, download_dir=download_dir, progress_bar=False
-        )
+        return download_files_in_threadpool(*http_urls, out=download_dir, progress_bar=False)

@@ -95,10 +95,12 @@ class TungstenClient:
                 docker_image=f'{remote_docker_repo.split("/")[-1]}:{remote_docker_tag}',
                 input_schema=model.io.input_schema,
                 output_schema=model.io.output_schema,
-                description=model.description,
+                demo_output_schema=model.io.demo_output_schema,
+                input_filetypes=model.io.input_filetypes,
+                output_filetypes=model.io.output_filetypes,
+                demo_output_filetypes=model.io.demo_output_filetypes,
                 batch_size=model.batch_size,
-                gpu=model.gpu,
-                gpu_min_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu_mem_gb else None,
+                gpu_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu and model.gpu_mem_gb else 0,
             )
             model_in_server = self.api.create_model(project=project, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
@@ -107,15 +109,6 @@ class TungstenClient:
                 log_info("Updating the README")
                 self.api.update_model_readme(
                     project=project, version=model_in_server.version, readme=model.readme
-                )
-                log_info("")
-
-            if model.examples:
-                log_info(f"Creating {len(model.examples)} prediction examples")
-                self.api.create_model_prediction_examples(
-                    project=project,
-                    version=model_in_server.version,
-                    examples=list(model.examples),
                 )
                 log_info("")
 
@@ -143,7 +136,9 @@ class TungstenClient:
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
 
-            if model_in_server.has_readme:
+            if model_in_server.readme_url:
+                readme_image_dir = tmp_dir / "readme_images"
+                readme_image_dir.mkdir()
                 log_info("Fetching the README")
                 readme = self.api.get_model_readme(
                     project=project, version=model_version, image_download_dir=tmp_dir
@@ -152,28 +147,31 @@ class TungstenClient:
             else:
                 readme = None
 
-            if model_in_server.examples_count > 0:
-                log_info("Fetching prediction examples")
-                examples = self.api.list_examples(
-                    project=project, version=model_version, file_download_dir=tmp_dir
+            if model_in_server.source_files_count > 0:
+                source_files_dir = tmp_dir / "source_files"
+                source_files_dir.mkdir()
+                log_info("Fetching source files")
+                source_files = self.api.download_model_source_tree(
+                    project=project, version=model_version, root_dir=source_files_dir
                 )
-                log_info("")
             else:
-                examples = list()
+                source_files = []
 
             avatar = self._get_model_avatar(project=project, model_version=model_version)
-            io_schema = storables.ModelIOData(
+            io_data = storables.ModelIOData(
                 input_schema=model_in_server.input_schema,
                 output_schema=model_in_server.output_schema,
+                demo_output_schema=model_in_server.demo_output_schema,
                 input_filetypes=model_in_server.input_filetypes,
                 output_filetypes=model_in_server.output_filetypes,
+                demo_output_filetypes=model_in_server.demo_output_filetypes,
             )
             m = storables.ModelData(
                 name=local_model_name,
-                io_schema=io_schema,
+                io_data=io_data,
                 avatar=avatar,
                 readme=readme,
-                examples=examples,
+                source_files=source_files,
             )
             m.save(file_blob_create_policy="rename")
 

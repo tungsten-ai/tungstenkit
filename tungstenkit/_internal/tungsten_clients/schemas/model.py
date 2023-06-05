@@ -22,35 +22,42 @@ class ModelCreate(BaseModel):
 
     input_schema: dict
     output_schema: dict
+    demo_output_schema: dict
 
-    description: str
-    batch_size: int
+    input_filetypes: dict
+    output_filetypes: dict
+    demo_output_filetypes: dict
 
     source_files: List[SourceFileDecl] = Field(default_factory=list)
     skipped_source_files: List[SkippedSourceFileDecl] = Field(default_factory=list)
 
-    gpu: bool
-    gpu_min_memory: Optional[int] = None
+    batch_size: int
+    gpu_memory: int
 
 
 class Model(BaseModel):
     id: int
+    project_id: int
+    project_full_slug: str
+
     version: str
-    description: Optional[str] = None
 
     docker_image: str
     docker_image_size: int
 
     input_schema: dict
     output_schema: dict
+    demo_output_schema: dict
     input_filetypes: dict
     output_filetypes: dict
+    demo_output_filetypes: dict
 
     os: str
     architecture: str
-    gpu: bool
+    gpu_memory: int
 
-    has_readme: bool
+    readme_url: Optional[str]
+
     source_files_count: int
     examples_count: int
 
