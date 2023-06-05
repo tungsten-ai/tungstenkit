@@ -69,6 +69,7 @@ binaryornot = "^0.4.4"
 python-multipart = "^0.0.6"
 urllib3 = "^1.26"
 dill = "^0.3.6"
+appdirs = "^1.4.4"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.1"
