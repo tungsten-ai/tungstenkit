@@ -1,8 +1,0 @@
-
-[project]
-name = "tungstenkit"
-dynamic = ["dependencies"]
-version = "3.7.9"
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}

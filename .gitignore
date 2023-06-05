@@ -159,4 +159,4 @@ cython_debug/
 #.idea/
 
 .pypirc
-examples/diffuser/diffusers-cache/*
+.tungsten-build-*
