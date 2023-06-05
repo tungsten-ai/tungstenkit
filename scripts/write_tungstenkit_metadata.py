@@ -16,7 +16,9 @@ if not pyproject_toml_path_in_proj.is_file():
     raise FileNotFoundError(pyproject_toml_path_in_proj)
 
 
-requirements_txt_path_in_pkg = Path(containerize.__file__).parent / "metadata" / "requirements.txt"
+requirements_txt_path_in_pkg = (
+    Path(containerize.__file__).parent / "metadata" / "tungstenkit" / "requirements.txt"
+)
 pyproject_toml_path_in_pkg = requirements_txt_path_in_pkg.with_name(
     pyproject_toml_path_in_proj.name
 )
@@ -32,7 +34,8 @@ subprocess.run(
         "requirements.txt",
         "-o",
         str(requirements_txt_path_in_pkg),
-    ]
+    ],
+    check=True,
 )
 print(requirements_txt_path_in_pkg.read_text())
 print(f"Written to {requirements_txt_path_in_pkg}")
