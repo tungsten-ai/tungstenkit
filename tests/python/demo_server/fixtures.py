@@ -4,10 +4,9 @@ from pathlib import Path
 
 import pytest
 import requests
-import uvicorn
 
-from tungstenkit._internal.containers import ModelContainer
-from tungstenkit._internal.demo_server import create_demo_app
+from tungstenkit._internal import storables
+from tungstenkit._internal.demo_server import start_demo_server
 
 DEMO_SERVER_HOST = "localhost"
 DEMO_SERVER_PORT = 32483
@@ -17,21 +16,20 @@ SETUP_TIMEOUT = 5
 
 @pytest.fixture(scope="session")
 def demo_server_base_url(
-    dummy_model_container: ModelContainer, tmpdir_factory: pytest.TempdirFactory
+    dummy_model_data: storables.ModelData, tmpdir_factory: pytest.TempdirFactory
 ):
-    app = create_demo_app(
-        tmp_dir=Path(tmpdir_factory.mktemp("dummy-model-demo-server")),
-        model_container=dummy_model_container,
-    )
+    tmp_dir = Path(tmpdir_factory.mktemp("dummy-model-demo-server"))
     proc = Process(
-        target=uvicorn.run,
-        args=(app,),
-        kwargs={"host": DEMO_SERVER_HOST, "port": DEMO_SERVER_PORT},
+        target=_run,
+        args=(dummy_model_data, tmp_dir),
         daemon=True,
     )
     proc.start()
     start_time = time.monotonic()
     while True:
+        if not proc.is_alive():
+            proc.join()
+
         assert proc.is_alive()
         assert time.monotonic() - start_time < SETUP_TIMEOUT
         try:
@@ -43,6 +41,15 @@ def demo_server_base_url(
 
     yield DEMO_SERVER_BASE_URL
     proc.kill()
+
+
+def _run(model_data: storables.ModelData, tmp_dir: Path):
+    start_demo_server(
+        tmp_dir=tmp_dir,
+        model_data=model_data,
+        host=DEMO_SERVER_HOST,
+        port=DEMO_SERVER_PORT,
+    )
 
 
 __all__ = ["demo_server_base_url"]

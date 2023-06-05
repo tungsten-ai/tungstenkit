@@ -5,7 +5,7 @@ import typing as t
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from threading import Thread
+from threading import Event, Thread
 
 import attrs
 from fastapi import HTTPException, Request
@@ -21,19 +21,20 @@ EXPIRATION_SECONDS = 10 * 60
 GARBAGE_COLLECTION_INTERVAL = 10
 
 
-@attrs.define
+@attrs.define(hash=True)
 class FileMetadata:
     protected: bool
     created_at: datetime = attrs.field(factory=datetime.utcnow)
 
 
-@attrs.define
+@attrs.define(hash=True)
 class FileService:
     base_dir: Path
 
     _lock_to_resolve_path: ReaderWriterLock = attrs.field(factory=ReaderWriterLock, init=False)
     _file_access_locks: t.Dict[str, ReaderWriterLock] = attrs.field(factory=dict, init=False)
     _file_metadata_dict: t.Dict[str, FileMetadata] = attrs.field(factory=dict, init=False)
+    _gc_term_event: t.Optional[Event] = attrs.field(default=None, init=False)
 
     def __attrs_post_init__(self):
         self.base_dir = self.base_dir.resolve()
@@ -81,7 +82,8 @@ class FileService:
         path = self.base_dir / filename
         return path
 
-    def start_garbage_collection(self) -> Thread:
+    def start_garbage_collection(self, gc_term_event: Event) -> Thread:
+        self._gc_term_event = gc_term_event
         thread = Thread(target=self._run_garbage_collection, daemon=True)
         thread.start()
         return thread
@@ -130,7 +132,8 @@ class FileService:
                 self._collect_garbages()
                 log_debug(f"Remaining files: {', '.join(self.filenames)}")
         except BaseException:
-            os.kill(os.getpid(), signal.SIGUSR2)
+            self._gc_term_event.set()
+            os.kill(os.getpid(), signal.SIGTERM)
 
     def _collect_garbages(self):
         current = datetime.utcnow()

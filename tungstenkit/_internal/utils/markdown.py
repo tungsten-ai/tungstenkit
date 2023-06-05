@@ -87,8 +87,12 @@ def change_local_image_links_in_markdown(
 ) -> str:
     assert len(local_img_paths) == len(updates)
 
+    local_img_paths = [p.resolve() for p in local_img_paths]
+    print(local_img_paths)
+
     def fn(img_link: str):
         f = furl(img_link)
+        print(img_link)
 
         updated: t.Optional[str] = None
         if f.scheme == "file":
@@ -99,9 +103,9 @@ def change_local_image_links_in_markdown(
 
             updated = updates[idx]
 
-        elif f.scheme is None:
+        else:
             try:
-                idx = local_img_paths.index(Path(img_link))
+                idx = local_img_paths.index(Path(img_link).resolve())
             except ValueError:
                 return img_link
 

@@ -1,0 +1,14 @@
+{% import 'macros/cache.j2' as cache %}
+RUN {{ cache.mount_apt_cache() }} apt-get install -y --no-install-recommends \
+    software-properties-common gpg-agent curl && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    python{{ python_version }} python{{ python_version }}-dev python{{ python_version }}-distutils
+RUN ln -sf /usr/bin/python{{ python_version }} /usr/bin/python3 && \
+    ln -sf /usr/bin/pip{{ python_version }} /usr/bin/pip3 && \
+    ln -sf /usr/bin/python{{ python_version }} /usr/bin/python && \
+    ln -sf /usr/bin/pip{{ python_version }} /usr/bin/pip && \
+    curl -O https://bootstrap.pypa.io/get-pip.py && \
+    python3 get-pip.py && \
+    rm -rf get-pip.py

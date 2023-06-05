@@ -1,27 +1,43 @@
-import json
+import shutil
 import signal
+import tempfile
 from pathlib import Path
+from threading import Event
 
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from tungstenkit._internal.containers import ModelContainer
-from tungstenkit._internal.json_store import JSONCollection
-from tungstenkit._internal.logging import log_error
+from tungstenkit._internal import storables
+from tungstenkit._internal.containers import ModelContainer, start_model_container
 from tungstenkit._internal.model_clients import ModelContainerClient
-from tungstenkit._internal.storables import StoredModelData
 
 from . import schemas
 from .services import FileService, PredictionService
 
+# TODO https
+# TODO issue access token like jupyter
+
 frontend_dir_in_pkg = Path(__file__).parent / "frontend"
 
 
-def create_demo_app(tmp_dir: Path, model_container: ModelContainer):
-    # TODO https
-    # TODO issue access token like jupyter
+def start_demo_server(model_data: storables.ModelData, tmp_dir: Path, host: str, port: int):
+    # NOTE We create tempdir in current directory since docker desktop doesn't allow
+    # to bind host dirs outside the user home directory
+    with tempfile.TemporaryDirectory(
+        prefix=".tungsten-container-volume-",
+        dir=".",
+    ) as container_tmp_dir:
+        with start_model_container(
+            model_data, bind_dir_in_host=Path(container_tmp_dir)
+        ) as container:
+            app = _create_app(tmp_dir, container)
+            uvicorn.run(app, host=host, port=port)
+
+
+def _create_app(tmp_dir: Path, container: ModelContainer):
     app = FastAPI()
 
     app.add_middleware(
@@ -33,11 +49,11 @@ def create_demo_app(tmp_dir: Path, model_container: ModelContainer):
     )
 
     frontend_dir_in_tmp_dir = tmp_dir / "frontend"
-    frontend_dir_in_tmp_dir.symlink_to(frontend_dir_in_pkg)
+    shutil.copytree(frontend_dir_in_pkg, frontend_dir_in_tmp_dir)
 
     _add_api_endpoints(
         app=app,
-        model_container=model_container,
+        model_container=container,
         file_dir=tmp_dir / "files",
     )
     _mount_frontend_dir(app=app, dir=frontend_dir_in_tmp_dir)
@@ -50,9 +66,7 @@ def _add_api_endpoints(
     model_container: ModelContainer,
     file_dir: Path,
 ):
-    # Load model data from store
-    store = JSONCollection[StoredModelData](StoredModelData)
-    stored_model_data = store.get(model_container.model_name)
+    model_data = storables.ModelData.load(model_container.model_name)
 
     # Prepare services
     model_client = ModelContainerClient(container=model_container)
@@ -60,33 +74,39 @@ def _add_api_endpoints(
     prediction_service = PredictionService(
         file_service=file_service,
         model_client=model_client,
-        input_schema=json.loads(stored_model_data.io.input_schema.file_path.read_bytes()),
+        input_schema=model_data.io.input_schema,
+        input_filetypes=model_data.io.input_filetypes,
     )
 
     # Start garbage collection
-    file_gc_thread = file_service.start_garbage_collection()
-    prediction_gc_thread = prediction_service.start_garbage_collection()
-    is_gc_error_printed = False
+    gc_term_event = Event()
+    file_gc_thread = file_service.start_garbage_collection(gc_term_event)
+    prediction_gc_thread = prediction_service.start_garbage_collection(gc_term_event)
+    is_gc_error_raised = False
+
+    orig_sig_handler = signal.getsignal(signal.SIGTERM)
 
     def log_gc_errors(*args, **argv):
-        if not is_gc_error_printed:
-            if not prediction_gc_thread.is_alive():
-                log_error("Prediction garbage collector is unexpectedly terminated")
-            if not file_gc_thread.is_alive():
-                log_error("File garbage collector is unexpectedly terminated")
+        if gc_term_event.is_set():
+            gc_term_event.clear()
+            if not is_gc_error_raised:
+                if not prediction_gc_thread.is_alive():
+                    raise RuntimeError("Prediction garbage collector is unexpectedly terminated")
+                if not file_gc_thread.is_alive():
+                    raise RuntimeError("File garbage collector is unexpectedly terminated")
+        else:
+            orig_sig_handler(*args, **argv)
 
-    signal.signal(signal.SIGUSR2, log_gc_errors)
+    signal.signal(signal.SIGTERM, log_gc_errors)
 
     # Add endpoints
     @app.get("/metadata", response_model=schemas.Metadata)
     def get_model_metadata(req: Request):
-        return schemas.Metadata.build(
-            model=store.get(stored_model_data.name), file_service=file_service, request=req
-        )
+        return schemas.Metadata.build(model=model_data, file_service=file_service, request=req)
 
     @app.post("/predictions", response_model=schemas.PostPredictionResponse)
-    def create_prediction(body: schemas.PostPredictionRequest, req: Request):
-        prediction_id = prediction_service.create_prediction(input=body.__root__, request=req)
+    def create_prediction(body: schemas.PostPredictionRequest):
+        prediction_id = prediction_service.create_prediction(input=body.__root__)
         return schemas.PostPredictionResponse(prediction_id=prediction_id)
 
     @app.get("/predictions/{prediction_id}", response_model=schemas.Prediction)
@@ -109,14 +129,14 @@ def _add_api_endpoints(
     @app.get(
         "/files/{filename}",
         response_class=FileResponse,
-        dependencies=[Depends(file_service.acquire_read_lock)],
         name="files",
     )
     def download_file(filename: str):
-        if not file_service.check_existence(filename, strict=True):
-            raise HTTPException(status_code=404, detail=filename)
-        path = file_service.get_path_by_filename(filename).resolve()
-        return FileResponse(path=path)
+        with file_service.acquire_read_lock(filename):
+            if not file_service.check_existence(filename, strict=True):
+                raise HTTPException(status_code=404, detail=filename)
+            path = file_service.get_path_by_filename(filename).resolve()
+            return FileResponse(path=path)
 
 
 def _mount_frontend_dir(app: FastAPI, dir: Path):

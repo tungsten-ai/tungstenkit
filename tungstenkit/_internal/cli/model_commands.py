@@ -5,7 +5,6 @@ from datetime import timezone
 from pathlib import Path
 
 import click
-import uvicorn
 from fastapi.encoders import jsonable_encoder
 from tabulate import tabulate
 
@@ -16,8 +15,7 @@ from tungstenkit._internal.constants import (
     TUNGSTEN_LOGO,
 )
 from tungstenkit._internal.containerize import build_model
-from tungstenkit._internal.containers import start_model_container
-from tungstenkit._internal.demo_server import create_demo_app
+from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
 from tungstenkit._internal.utils import docker
 
@@ -137,23 +135,16 @@ def demo(model_name: str, host: str, port: int, **kwargs):
     """
     print_pretty(f"Start demo for model '{model_name}'\n")
 
-    model = model_store.get(model_name)
+    model_data = model_store.get(model_name)
 
     # Start demo app
-    # NOTE We create tempdir in current directory since docker desktop doesn't allow
-    # to bind host dirs outside the user home directory
-    with tempfile.TemporaryDirectory(
-        prefix=".tungsten-container-volume-",
-        dir=".",
-    ) as container_tmp_dir:
-        with start_model_container(model, bind_dir_in_host=Path(container_tmp_dir)) as container:
-            with tempfile.TemporaryDirectory() as server_tmp_dir:
-                app = create_demo_app(
-                    model_container=container,
-                    tmp_dir=Path(server_tmp_dir),
-                )
-                print(TUNGSTEN_LOGO)
-                uvicorn.run(app, host=host, port=port)
+    with tempfile.TemporaryDirectory() as server_tmp_dir:
+        start_demo_server(
+            model_data=model_data,
+            tmp_dir=Path(server_tmp_dir),
+            host=host,
+            port=port,
+        )
 
 
 @model.command()

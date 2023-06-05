@@ -82,7 +82,7 @@ def stored_model_name_callback(ctx, param, model_name: t.Optional[str]) -> str:
             m = _m
 
     rprint("[bold green]succeeded[/bold green]")
-    rprint(f"Use model {m.name}")
+    rprint(f"Use model '{m.name}'")
     return m.name
 
 

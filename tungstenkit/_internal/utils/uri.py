@@ -41,7 +41,10 @@ def check_if_http_or_https_uri(obj) -> bool:
 
 
 def get_path_from_file_url(file_uri: str) -> Path:
-    return "/" / Path(*furl(file_uri).path.segments)
+    segments = list(furl(file_uri).path.segments)
+    if os.name == "nt" and segments[0].endswith(":"):
+        segments[0] += "\\"
+    return "/" / Path(*segments)
 
 
 def get_pure_posix_path_from_file_uri(file_uri: str) -> PurePosixPath:

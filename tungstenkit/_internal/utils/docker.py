@@ -265,10 +265,10 @@ def remove_docker_container(
     try:
         container: Container = docker_client.containers.get(container_name_or_id)
         container.remove(force=force)
-    except docker_errors.NotFound:
+    except (docker_errors.NotFound, docker_errors.APIError) as e:
         if force:
             return
-        raise DockerError(f"container '{container_name_or_id}' not found")
+        raise DockerError(str(e))
 
 
 def remove_docker_image(
@@ -280,10 +280,10 @@ def remove_docker_image(
     try:
         image: Image = docker_client.images.get(image_name_or_id)
         image.remove(force=force)
-    except docker_errors.NotFound:
+    except (docker_errors.NotFound, docker_errors.APIError) as e:
         if force:
             return
-        raise DockerError(f"image {image_name_or_id} not found")
+        raise DockerError(str(e))
 
 
 def copy_from_image(
@@ -355,7 +355,7 @@ def start_server_container(
     _docker_client = docker_client if docker_client else get_docker_client()
     internal_port_with_type = f"{internal_port}/tcp"
     termination_event = threading.Event()
-    orig_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
+    orig_sig_handler = signal.getsignal(signal.SIGTERM)
 
     # TODO environment variables
     _docker_client = docker_client if docker_client else get_docker_client()
@@ -381,10 +381,13 @@ def start_server_container(
                 raise e
 
     def handle_signal(*args, **argv):
-        raise DockerError(
-            "Container unexpectedly terminated\n"
-            f"{load_container_logs(container.id, docker_client=_docker_client)}\n"
-        )
+        if termination_event.is_set():
+            raise DockerError(
+                "Container unexpectedly terminated\n"
+                f"{load_container_logs(container.id, docker_client=_docker_client)}\n"
+            )
+        else:
+            orig_sig_handler(*args, **argv)
 
     def check_model_server():
         _container: Container = _docker_client.containers.get(container.id)
@@ -392,12 +395,12 @@ def start_server_container(
             _container.reload()
             if not termination_event.is_set() and _container.status == "exited":
                 termination_event.set()
-                os.kill(os.getpid(), signal.SIGUSR1)
+                os.kill(os.getpid(), signal.SIGTERM)
             else:
                 time.sleep(CONTAINER_CHECK_INTERVAL_SEC)
 
     try:
-        signal.signal(signal.SIGUSR1, handle_signal)
+        signal.signal(signal.SIGTERM, handle_signal)
 
         thread_checking_model_container = threading.Thread(target=check_model_server, daemon=True)
         thread_checking_model_container.start()
@@ -427,7 +430,7 @@ def start_server_container(
     finally:
         termination_event.set()
         container.remove(force=True)
-        signal.signal(signal.SIGUSR1, orig_sigusr1_handler)
+        signal.signal(signal.SIGTERM, orig_sig_handler)
 
 
 def run(*docker_run_args: str):
