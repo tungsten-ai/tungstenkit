@@ -103,8 +103,10 @@ class PullPushResult:
     repo: str
     tag: str
 
-    _failure_reason: t.Optional[PullPushFailureReason] = attrs.field(default=None, init=False)
-    _error_message: t.Optional[str] = attrs.field(default=None, init=False)
+    _failure_reason: t.Optional[PullPushFailureReason] = attrs.field(
+        default=None, alias="failure_reason"
+    )
+    _error_message: t.Optional[str] = attrs.field(default=None, alias="error_message")
 
     @property
     def is_success(self) -> bool:

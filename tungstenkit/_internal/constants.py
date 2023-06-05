@@ -35,7 +35,7 @@ TUNGSTEN_LOGO = r"""
 """
 
 DEFAULT_MODEL_MODULE = "tungsten_model"
-DEFAULT_TUNGSTEN_SERVER_URL = "https://server.tungsten-ai.com"
+DEFAULT_TUNGSTEN_SERVER_URL = "https://api.tungsten-ai.com"
 
 DATA_DIR = Path(os.getenv("TUNGSTEN_DATA_DIR", Path(appdirs.user_data_dir)))
 DATA_DIR = DATA_DIR.resolve()

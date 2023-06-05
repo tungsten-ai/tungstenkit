@@ -1,6 +1,5 @@
 import io
 import typing as t
-from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
 import requests
@@ -9,7 +8,6 @@ from furl import furl
 from tungstenkit import exceptions
 from tungstenkit._internal import storables
 from tungstenkit._internal.logging import log_debug
-from tungstenkit._internal.utils.json import change_strings_in_jsonable, get_uris_in_jsonable
 from tungstenkit._internal.utils.markdown import (
     change_img_links_in_markdown,
     change_local_image_links_in_markdown,
@@ -30,7 +28,7 @@ from . import schemas
 if t.TYPE_CHECKING:
     from _typeshed import StrPath
 
-API_BASE_STR = "/api/v1"
+API_BASE_STR = "/v1"
 CONNECTION_TINEOUT = 10
 
 
@@ -69,23 +67,22 @@ class TungstenAPIClient:
         _check_resp(resp, f.url, "Failed to fetch user info")
         return schemas.User.parse_raw(resp.text)
 
-    def check_if_project_exists(self, project: str):
+    def check_if_project_exists(self, project: str) -> bool:
         f = furl(self.base_url)
         f.path = f.path / API_BASE_STR / "projects" / project / "exists"
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
         _check_resp(resp, f.url, f"Failed to check existence of project '{project}'")
         parsed = schemas.Existence.parse_raw(resp.text)
-        if not parsed.exists:
-            raise exceptions.NotFound(f"No project '{project}' in {self.base_url}")
+        return parsed.exists
 
-    def get_project_avatar(self, project: str) -> t.Optional[storables.AvatarData]:
+    def get_project_avatar(self, project: str) -> storables.AvatarData:
         f = furl(self.base_url)
         f.path = f.path / API_BASE_STR / "projects" / project / "avatar"
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
         if resp.status_code == 404:
-            return None
+            return storables.AvatarData.fetch_default(project + " avatar", avatar_domain=f.host)
 
         _check_resp(resp, f.url, f"Failed to fetch the avatar of project '{project}'")
         return storables.AvatarData(bytes_=resp.content, extension=".png")
@@ -107,103 +104,14 @@ class TungstenAPIClient:
         _check_resp(resp, f.url, f"Failed to create a model in project '{project}'")
         return schemas.Model.parse_raw(resp.text)
 
-    def create_model_prediction_examples(
-        self, project: str, version: str, examples: t.List[storables.PredExampleData]
-    ) -> t.List[schemas.ModelPredictionExample]:
-        examples_count = len(examples)
-        if examples_count == 0:
-            return []
-
-        # file_paths_per_example[i]: (input_file_paths, output_file_paths)
-        file_paths_per_example: t.List[t.Tuple[t.List[Path], t.List[Path]]] = []
-        for e in examples:
-            file_paths_per_example.append(
-                ([f for f in e.input_files], [f for f in e.output_files])
-            )
-        # file_counts_per_example[i]: (input_files_count, output_files_count)
-        file_counts_per_example: t.List[t.Tuple[int, int]] = []
-        file_paths: t.List[Path] = []
-        for input_files, output_files in file_paths_per_example:
-            file_counts_per_example.append((len(input_files), len(output_files)))
-            file_paths.extend(input_files)
-            file_paths.extend(output_files)
-        file_uris = [p.as_uri() for p in file_paths]
-        file_serving_urls = self.upload_multiple_files_by_paths(
-            project=project,
-            paths=file_paths,
-            desc="Uploading files in example predictions",
-        )
-        # file_serving_urls_per_example[i]: (input_file_serving_urls, output_file_serving_urls)
-        file_serving_urls_per_example: t.List[t.Tuple[t.List[str], t.List[str]]] = []
-        start_idx = 0
-        for input_files_count, output_files_count in file_counts_per_example:
-            input_file_serving_urls = file_serving_urls[start_idx : start_idx + input_files_count]
-            start_idx += input_files_count
-            output_file_serving_urls = file_serving_urls[
-                start_idx : start_idx + output_files_count
-            ]
-            start_idx += output_files_count
-            file_serving_urls_per_example.append(
-                (input_file_serving_urls, output_file_serving_urls)
-            )
-
-        jsonables_per_example = []
-        for e in examples:
-            input = e.input
-            output = e.output
-            demo_output = e.demo_output
-            jsonables_per_example.append([input, output, demo_output])
-
-        jsonables_per_example = change_strings_in_jsonable(
-            jsonable=jsonables_per_example,
-            values=file_uris,
-            updates=file_serving_urls,
-        )
-
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "examples"
-        url = f.url
-
-        def create(example_idx: int):
-            _input, _output, _demo_output = jsonables_per_example[example_idx]
-            _input_file_serving_urls, _output_file_serving_urls = file_serving_urls_per_example[
-                example_idx
-            ]
-
-            req = schemas.ModelPredictionExampleCreate(
-                input=_input,
-                output=_output,
-                demo_output=_demo_output,
-                input_files=_input_file_serving_urls,
-                output_files=_output_file_serving_urls,
-            )
-            data = req.json()
-            log_request(url=url, method="POST", data=data)
-            resp = self.sess.post(url, data=data, timeout=CONNECTION_TINEOUT)
-            _check_resp(
-                resp, url, f"Failed to create a prediction example for model '{project}:{version}'"
-            )
-            parsed = schemas.ModelPredictionExample.parse_raw(resp.text)
-            log_debug("Response: " + str(parsed), pretty=False)
-
-        fut_list: t.List[Future] = []
-        responses: t.List[schemas.ModelPredictionExample] = []
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            for i in range(examples_count):
-                fut_list.append(executor.submit(create, i))
-
-            for fut in fut_list:
-                responses.append(fut.result())
-
-        return responses
-
     def update_model_readme(
         self, project: str, version: str, readme: storables.MarkdownData
     ) -> None:
         if len(readme.image_files) > 0:
-            image_file_serving_urls = self.upload_multiple_files_by_paths(
+            resps = self.upload_multiple_files_by_paths(
                 project=project, paths=readme.image_files, desc="Uploading image files in README"
             )
+            image_file_serving_urls = [r.serving_url for r in resps]
             readme_content = change_local_image_links_in_markdown(
                 md=readme.content,
                 local_img_paths=readme.image_files,
@@ -280,9 +188,7 @@ class TungstenAPIClient:
                 contents = folder.contents
                 for c in contents:
                     p = path / c.name if path else PurePosixPath(c.name)
-                    if c.type == "folder":
-                        _add(p, c)
-                    else:
+                    if c.type == "file":
                         if c.skipped:
                             downloaded = None
                         else:
@@ -301,86 +207,32 @@ class TungstenAPIClient:
                                 size=c.size,
                             )
                         )
+                    else:
+                        _add(p, c)
 
         _add(None, root)
         self.download_multiple_files(urls, download_paths)
         return ret
 
-    def list_examples(
-        self, project: str, version: str, file_download_dir: Path
-    ) -> t.List[storables.PredExampleData]:
-        # Get examples in db
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "examples"
-        log_request(url=f.url, method="GET")
-        resp = self.sess.get(url=f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(resp, f.url, f"Failed to get the README of model {project}:{version}")
-        examples_in_server = schemas.ListModelPredictionExamples.parse_raw(resp.text).__root__
-
-        # Download files in examples
-        input_file_serving_urls_per_example = [
-            get_uris_in_jsonable(e.input, schemes=["http", "https"]) for e in examples_in_server
-        ]
-        output_file_serving_urls_per_example = [
-            get_uris_in_jsonable([e.output, e.demo_output], schemes=["http", "https"])
-            for e in examples_in_server
-        ]
-        file_serving_urls: t.List[str] = []
-        for urls in input_file_serving_urls_per_example:
-            file_serving_urls.extend(urls)
-        for urls in output_file_serving_urls_per_example:
-            file_serving_urls.extend(urls)
-
-        downloaded_paths = (
-            self.download_multiple_files(
-                file_serving_urls,
-                file_download_dir,
-                desc="Downloading files in prediction examples",
-            )
-            if len(file_serving_urls) > 0
-            else []
+    def upload_model_source_files(
+        self, project: str, files: t.Iterable[storables.SourceFile]
+    ) -> t.Tuple[t.List[schemas.SourceFileDecl], t.List[schemas.SkippedSourceFileDecl]]:
+        source_files, skipped_source_files = [], []
+        upload_path_dict = {f: f.abs_path_in_host_fs for f in files if f.abs_path_in_host_fs}
+        upload_resps = self.upload_multiple_files_by_paths(
+            project=project, paths=list(upload_path_dict.values()), desc="Uploading source files"
         )
+        upload_resp_dict = {f: url for f, url in zip(upload_path_dict.keys(), upload_resps)}
+        for f in files:
+            p = str(f.rel_path_in_model_fs)
+            if f in upload_resp_dict:
+                source_files.append(
+                    schemas.SourceFileDecl(path=p, upload_id=upload_resp_dict[f].id)
+                )
+            else:
+                skipped_source_files.append(schemas.SkippedSourceFileDecl(path=p, size=f.size))
 
-        start_idx = 0
-        input_file_paths_per_example: t.List[t.List[Path]] = list()
-        output_file_paths_per_example: t.List[t.List[Path]] = list()
-        for urls in input_file_serving_urls_per_example:
-            count = len(urls)
-            input_file_paths_per_example.append(downloaded_paths[start_idx : start_idx + count])
-            start_idx += count
-        for urls in output_file_serving_urls_per_example:
-            count = len(urls)
-            output_file_paths_per_example.append(downloaded_paths[start_idx : start_idx + count])
-            start_idx += count
-
-        # Update inputs, outputs, and demo outputs
-        downloaded_examples = [
-            storables.PredExampleData(
-                input=e.input,
-                output=e.output,
-                demo_output=e.demo_output,
-                input_files=input_file_paths_per_example[i],
-                output_files=output_file_paths_per_example[i],
-            )
-            for i, e in enumerate(examples_in_server)
-        ]
-        for i, e in enumerate(downloaded_examples):
-            e.input = change_strings_in_jsonable(
-                e.input,
-                values=input_file_serving_urls_per_example[i],
-                updates=[p.as_uri() for p in e.input_files],
-            )
-            e.output = change_strings_in_jsonable(
-                e.output,
-                values=output_file_serving_urls_per_example[i],
-                updates=[p.as_uri() for p in e.output_files],
-            )
-            e.demo_output = change_strings_in_jsonable(
-                e.demo_output,
-                values=output_file_serving_urls_per_example[i],
-                updates=[p.as_uri() for p in e.output_files],
-            )
-        return downloaded_examples
+        return source_files, skipped_source_files
 
     def get_server_metadata(self) -> schemas.ServerMetadata:
         f = furl(self.base_url)
@@ -437,7 +289,7 @@ class TungstenAPIClient:
 
     def upload_multiple_files_by_paths(
         self, project: str, paths: t.List[Path], desc: t.Optional[str] = None
-    ) -> t.List[str]:
+    ) -> t.List[schemas.FileUploadResponse]:
         if len(paths) == 0:
             return []
 
@@ -453,14 +305,14 @@ class TungstenAPIClient:
             progress_bar=True,
             desc=desc,
         )
-        serving_urls: t.List[str] = []
+        ret = []
         for p, resp in zip(paths, responses):
             _check_resp(resp, f.url, f"Failed to upload file '{p}'")
             parsed = schemas.FileUploadResponse.parse_raw(resp.text)
             log_debug(f"Response of uploading {p}: {parsed}", pretty=False)
-            serving_urls.append(parsed.serving_url)
+            ret.append(parsed)
 
-        return serving_urls
+        return ret
 
     def download_file(
         self,

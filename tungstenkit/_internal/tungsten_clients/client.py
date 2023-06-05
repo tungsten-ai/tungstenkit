@@ -6,6 +6,7 @@ from docker.client import DockerClient
 from docker.models.images import Image as DockerImage
 from rich.prompt import Prompt
 
+from tungstenkit import exceptions
 from tungstenkit._internal import storables
 from tungstenkit._internal.configs import TungstenClientConfig
 from tungstenkit._internal.logging import log_debug, log_info
@@ -71,8 +72,9 @@ class TungstenClient:
         self,
         model_name: str,
         project: str,
-    ) -> None:
-        self.api.check_if_project_exists(project)
+    ) -> schemas.Model:
+        # if not self.api.check_if_project_exists(project):
+        # raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
 
         model = storables.ModelData.load(model_name)
         docker_image_id = model.docker_image_id
@@ -90,6 +92,13 @@ class TungstenClient:
             )
             log_info("")
 
+            if model.source_files and model.source_files.files:
+                source_files, skipped_source_files = self.api.upload_model_source_files(
+                    project=project, files=model.source_files.files
+                )
+            else:
+                source_files, skipped_source_files = [], []
+
             log_info(f"Creating a model in {self.api.base_url}")
             req = schemas.ModelCreate(
                 docker_image=f'{remote_docker_repo.split("/")[-1]}:{remote_docker_tag}',
@@ -99,8 +108,9 @@ class TungstenClient:
                 input_filetypes=model.io.input_filetypes,
                 output_filetypes=model.io.output_filetypes,
                 demo_output_filetypes=model.io.demo_output_filetypes,
-                batch_size=model.batch_size,
                 gpu_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu and model.gpu_mem_gb else 0,
+                source_files=source_files,
+                skipped_source_files=skipped_source_files,
             )
             model_in_server = self.api.create_model(project=project, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
@@ -121,9 +131,11 @@ class TungstenClient:
             f" - project: [green]{project}[/green]\n"
             f" - version: [green]{model_in_server.version}[/green]"
         )
+        return model_in_server
 
-    def pull_model(self, project: str, model_version: str) -> None:
-        self.api.check_if_project_exists(project)
+    def pull_model(self, project: str, model_version: str) -> storables.ModelData:
+        if not self.api.check_if_project_exists(project):
+            raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
 
         model_in_server = self.api.get_model(project=project, version=model_version)
         repo_name, tag = model_in_server.docker_image.split(":", maxsplit=1)
@@ -157,7 +169,7 @@ class TungstenClient:
             else:
                 source_files = []
 
-            avatar = self._get_model_avatar(project=project, model_version=model_version)
+            avatar = self.api.get_project_avatar(project=project)
             io_data = storables.ModelIOData(
                 input_schema=model_in_server.input_schema,
                 output_schema=model_in_server.output_schema,
@@ -177,6 +189,7 @@ class TungstenClient:
 
             log_info("")
             print_success(f"Successfully pulled '{remote_docker_repo}:{tag}'")
+            return storables.ModelData.load(local_model_name)
 
     def _push_to_docker_registry(self, repo: str, tag: str, docker_client: DockerClient):
         result = push_to_docker_registry(repo=repo, tag=tag, docker_client=docker_client)
@@ -213,14 +226,6 @@ class TungstenClient:
             self._login_to_docker_registry(auth_config)
 
         result.raise_on_error()
-
-    def _get_model_avatar(self, project: str, model_version: str) -> storables.AvatarData:
-        avatar = self.api.get_project_avatar(project)
-        if avatar:
-            return avatar
-        return storables.AvatarData.fetch_default(
-            hash_key=self.docker_registry + "/" + project + ":" + model_version
-        )
 
     def _login_to_docker_registry(self, auth_config: t.Optional[t.Dict[str, str]] = None):
         if auth_config is None:

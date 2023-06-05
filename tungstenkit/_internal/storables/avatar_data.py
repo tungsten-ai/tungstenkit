@@ -3,6 +3,8 @@ import attrs
 from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.utils.avatar import fetch_default_avatar_png
 
+DEFAULT_DOMAIN = "avatar.tungsten-ai.com"
+
 
 @attrs.frozen(kw_only=True)
 class StoredAvatar:
@@ -19,8 +21,8 @@ class AvatarData(BlobStorable[StoredAvatar]):
     extension: str
 
     @staticmethod
-    def fetch_default(hash_key: str, **kwargs):
-        raw = fetch_default_avatar_png(name=hash_key, **kwargs)
+    def fetch_default(hash_key: str, avatar_domain: str = DEFAULT_DOMAIN, **kwargs):
+        raw = fetch_default_avatar_png(hash_key=hash_key + "@" + avatar_domain, **kwargs)
         return AvatarData(bytes_=raw, extension=".png")
 
     def save_blobs(

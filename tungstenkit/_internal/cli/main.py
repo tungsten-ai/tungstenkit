@@ -9,7 +9,7 @@ from tungstenkit._internal.utils.context import hide_traceback
 from tungstenkit._internal.utils.docker import check_if_docker_available
 from tungstenkit._versions import pkg_version
 
-# from .login_command import login
+from .login_command import login
 from .model_commands import list_models, model
 from .options import common_options
 
@@ -38,7 +38,7 @@ def main():
     init_logger("INFO")
 
     # TODO Split management commands like 'model' and 'task' in the help message
-    # cli.add_command(login, "login")
+    cli.add_command(login, "login")
     cli.add_command(model, "model")
     for name, cmd in model.commands.items():
         if name == list_models.name:

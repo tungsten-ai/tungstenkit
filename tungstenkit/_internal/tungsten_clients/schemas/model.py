@@ -31,7 +31,6 @@ class ModelCreate(BaseModel):
     source_files: List[SourceFileDecl] = Field(default_factory=list)
     skipped_source_files: List[SkippedSourceFileDecl] = Field(default_factory=list)
 
-    batch_size: int
     gpu_memory: int
 
 
