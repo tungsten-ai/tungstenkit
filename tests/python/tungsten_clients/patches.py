@@ -1,17 +1,18 @@
-import json
 import mimetypes
 import typing as t
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Lock
 from unittest.mock import patch
 from urllib.parse import quote_plus
 from uuid import uuid4
 
 import responses
-from requests import PreparedRequest
+from requests_toolbelt.multipart import decoder
 
 from tungstenkit._internal import storables
 from tungstenkit._internal.tungsten_clients import schemas
+from tungstenkit._internal.utils.string import removeprefix, removesuffix
 
 from .fixtures import (
     MODEL_README_IMAGES_FOLDER_URL,
@@ -21,6 +22,10 @@ from .fixtures import (
     PROJECT_FILE_UPLOAD_URL,
     PROJECT_FILES_BASE_URL,
 )
+
+POSTED_FILE_ID_TO_PATH_MAPPING: t.Dict[int, Path] = dict()
+
+_file_upload_lock = Lock()
 
 
 def patch_file_get_resp_by_path(url: str, orig_path: Path):
@@ -39,31 +44,46 @@ def patch_file_get_resp_by_path(url: str, orig_path: Path):
 def patch_file_post_resp(tmp_dir: Path):
     id = 1
 
-    def file_post_callback(request: PreparedRequest):
-        assert request.body is not None
-        req = json.loads(request.body)
-        form = req["file"]
-        filename, buffer, content_type = form
+    def file_post_callback(request):
+        nonlocal id
 
-        data = buffer.read()
+        with _file_upload_lock:
+            # Parse multipart form data
+            content = request.body.read()
+            content_type = request.body.content_type
+            multipart = decoder.MultipartDecoder(content, content_type)
 
-        folder = uuid4().hex
-        data_dir = tmp_dir / folder
-        data_dir.mkdir()
-        data_path = data_dir / filename
-        data_path.write_bytes(data)
+            part = multipart.parts[0]
+            data = part.content
 
-        serving_url = f"{PROJECT_FILES_BASE_URL}/{folder}/{filename}"
+            # 'form-data; name="file"; filename="somefile"'
+            content_decomposition = part.headers[b"Content-Disposition"].decode()
+            content_type = part.headers[b"Content-Type"].decode()
+            filename = removesuffix(
+                removeprefix(content_decomposition, 'form-data; name="file"; filename="'), '"'
+            )
 
-        resp_body = schemas.FileUploadResponse(
-            id=id,
-            size=len(data),
-            content_type=content_type,
-            serving_url=serving_url,
-        )
-        headers = {"content-type": "application/json"}
+            # Write file
+            folder = uuid4().hex
+            data_dir = tmp_dir / folder
+            data_dir.mkdir()
+            data_path = data_dir / filename
+            data_path.write_bytes(data)
 
-        patch_file_get_resp_by_bytes(serving_url, data, content_type)
+            # Prepare response
+            serving_url = f"{PROJECT_FILES_BASE_URL}/{folder}/{filename}"
+            resp_body = schemas.FileUploadResponse(
+                id=id,
+                size=len(data),
+                content_type=content_type,
+                serving_url=serving_url,
+            )
+            headers = {"content-type": "application/json"}
+
+            patch_file_get_resp_by_bytes(serving_url, data, content_type)
+
+            POSTED_FILE_ID_TO_PATH_MAPPING[id] = data_path
+            id += 1
 
         return (200, headers, resp_body.json())
 
@@ -93,8 +113,9 @@ def patch_model_readme_file_get_resp(images: t.List[Path]):
 def patch_model_source_file_get_resp(source_files: t.Iterable[storables.SourceFile]):
     for f in source_files:
         if f.abs_path_in_host_fs:
+            url = MODEL_SOURCE_FILES_BASE_URL + "/" + quote_plus(str(f.rel_path_in_model_fs))
             patch_file_get_resp_by_path(
-                MODEL_SOURCE_FILES_BASE_URL + "/" + quote_plus(str(f.rel_path_in_model_fs)),
+                url,
                 f.abs_path_in_host_fs,
             )
 

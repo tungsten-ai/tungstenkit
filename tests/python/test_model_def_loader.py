@@ -20,8 +20,8 @@ def test_model_module_loader():
         demo_output_cls=dummy_model.DummyOutput,
     )(
         batch_size=4,
-        readme_md=str(dummy_model.README_PATH),
-        include_files=dummy_model.INCLUDE_FILES,
+        readme_md=str(dummy_model.DUMMY_MODEL_README_PATH),
+        include_files=dummy_model.DUMMY_MODEL_INCLUDE_FILES,
     )
     config = ModelConfig.with_types(
         input_cls=dummy_model.DummyInput,

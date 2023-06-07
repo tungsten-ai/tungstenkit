@@ -1,6 +1,6 @@
 import tempfile
-from pathlib import Path
-from typing import List, Optional
+from pathlib import Path, PurePosixPath
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 import pytest
@@ -8,12 +8,19 @@ from fastapi.encoders import jsonable_encoder
 from w3lib.url import parse_data_uri
 
 from tungstenkit import Image
+from tungstenkit._internal import storables
 
-from .dummy_model import DummyInput, DummyModel, DummyOutput
+from .dummy_model import (
+    DUMMY_MODEL_BUILD_DIR,
+    DUMMY_MODEL_DATA_DIR,
+    DUMMY_MODEL_MODULE_PATH,
+    DUMMY_MODEL_README_PATH,
+    DummyInput,
+    DummyModel,
+    DummyOutput,
+)
 
 IMAGE_DATA_URI = r"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAAAAABzQ+pjAAAAC0lEQVR4nGNgQAAAAAwAAXxMRMIAAAAASUVORK5CYII="  # noqa
-BUILD_DIR = Path(__file__).parent
-README_PATH = BUILD_DIR / "bin" / "markdown.md"
 
 
 @pytest.fixture
@@ -63,7 +70,29 @@ def dummy_model() -> DummyModel:
     return DummyModel()
 
 
+@pytest.fixture(scope="session")
+def dummy_model_all_source_files_dict() -> Dict[PurePosixPath, storables.SourceFile]:
+    host_paths = [p for p in DUMMY_MODEL_DATA_DIR.glob("**/*") if p.is_symlink() or p.is_file()]
+    host_paths += [DUMMY_MODEL_MODULE_PATH]
+    model_fs_paths = [PurePosixPath(p.relative_to(DUMMY_MODEL_BUILD_DIR)) for p in host_paths]
+    source_files = {
+        pm: storables.SourceFile(
+            abs_path_in_host_fs=ph,
+            rel_path_in_model_fs=pm,
+            size=ph.lstat().st_size if ph.is_symlink() else ph.stat().st_size,
+        )
+        for pm, ph in zip(model_fs_paths, host_paths)
+    }
+    return source_files
+
+
+@pytest.fixture(scope="session")
+def dummy_model_readme() -> storables.MarkdownData:
+    return storables.MarkdownData.from_path(DUMMY_MODEL_README_PATH)
+
+
 __all__ = [
     "dummy_model",
     "dummy_io_generator",
+    "dummy_model_all_source_files_dict",
 ]

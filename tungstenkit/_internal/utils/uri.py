@@ -3,6 +3,7 @@ import os
 import tempfile
 from pathlib import Path, PurePath, PurePosixPath
 from typing import TYPE_CHECKING, List, TypeVar
+from urllib.parse import unquote
 from uuid import uuid4
 
 from furl import furl
@@ -41,14 +42,15 @@ def check_if_http_or_https_uri(obj) -> bool:
 
 
 def get_path_from_file_url(file_uri: str) -> Path:
-    segments = list(furl(file_uri).path.segments)
+    segments = _parse_file_url_segments(file_uri)
     if os.name == "nt" and segments[0].endswith(":"):
         segments[0] += "\\"
     return "/" / Path(*segments)
 
 
 def get_pure_posix_path_from_file_uri(file_uri: str) -> PurePosixPath:
-    return "/" / PurePosixPath(*furl(file_uri).path.segments)
+    segments = _parse_file_url_segments(file_uri)
+    return "/" / PurePosixPath(*segments)
 
 
 def get_filename_from_uri(url: str) -> str:
@@ -92,3 +94,8 @@ def strip_scheme_in_http_url(http_url: str) -> str:
         return removeprefix(http_url, f.scheme + "://")
     else:
         raise NotImplementedError("Unsupported scheme: " + f.scheme)
+
+
+def _parse_file_url_segments(file_url: str) -> List[str]:
+    assert file_url.startswith("file:///"), f"Invalid file uri: {file_url}"
+    return [unquote(s) for s in removeprefix(file_url, "file:///").split("/")]

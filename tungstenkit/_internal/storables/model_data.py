@@ -6,12 +6,17 @@ import attrs
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.json_store import JSONItem, JSONStorable
 from tungstenkit._internal.utils.docker import get_docker_client, parse_docker_image_name
+from tungstenkit._internal.utils.serialize import load_attrs_from_json
 
 from .avatar_data import AvatarData, StoredAvatar
 from .markdown_data import MarkdownData, StoredMarkdown
 from .model_io_data import ModelIOData, StoredModelIOData
-from .pred_example_data import PredExampleData, StoredPredExampleData
-from .source_file_data import SerializedSourceFileCollection, SourceFile, SourceFileCollection
+from .source_file_data import (
+    SerializedSourceFileCollection,
+    SourceFile,
+    SourceFileCollection,
+    StoredSourceFileCollection,
+)
 
 
 @attrs.define(kw_only=True)
@@ -83,7 +88,6 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     io: StoredModelIOData
     avatar: StoredAvatar
     readme: t.Optional[StoredMarkdown] = None
-    examples: t.Dict[str, StoredPredExampleData] = attrs.field(factory=dict)
     source_files: t.Optional[SerializedSourceFileCollection] = None
 
     created_at: datetime = attrs.field(factory=datetime.utcnow)
@@ -104,16 +108,14 @@ class StoredModelData(_ModelDataInImage, JSONItem):
             blob_set.add(self.readme.markdown)
             for b in self.readme.images:
                 blob_set.add(b)
-
-        if self.examples is not None:
-            for example in self.examples.values():
-                blob_set.add(example.input)
-                blob_set.add(example.output)
-                blob_set.add(example.demo_output)
-                if example.logs:
-                    blob_set.add(example.logs)
-                for b in example.files:
-                    blob_set.add(b)
+        if self.source_files is not None:
+            blob_set.add(self.source_files.blob)
+            source_files = load_attrs_from_json(
+                StoredSourceFileCollection, self.source_files.blob.file_path
+            )
+            for f in source_files.files:
+                if f.blob is not None:
+                    blob_set.add(f.blob)
 
         return blob_set
 
@@ -139,7 +141,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
     io: ModelIOData
     avatar: AvatarData
     readme: t.Optional[MarkdownData] = None
-    examples: t.List[PredExampleData] = attrs.field(factory=list)
     source_files: t.Optional[SourceFileCollection] = None
 
     _created_at: t.Optional[datetime] = attrs.field(default=None, alias="created_at")
@@ -151,7 +152,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         io_data: ModelIOData,
         avatar: AvatarData,
         readme: t.Optional[MarkdownData] = None,
-        examples: t.Optional[t.List[PredExampleData]] = None,
         source_files: t.Optional[t.Iterable[SourceFile]] = None,
         id: t.Optional[str] = None,
         created_at: t.Optional[datetime] = None,
@@ -165,7 +165,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
         self.io = io_data
         self.avatar = avatar
         self.readme = readme
-        self.examples = examples if examples else []
         self.source_files = SourceFileCollection(source_files) if source_files else None
         self._created_at = created_at
 
@@ -205,13 +204,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
         )
 
-        stored_examples = dict()
-        for example in self.examples:
-            e = example.save_blobs(
-                blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
-            )
-            stored_examples[e.id] = e
-
         if self.source_files:
             stored_source_files = self.source_files.save_blobs(
                 blob_store=blob_store, file_blob_create_policy=file_blob_create_policy
@@ -230,7 +222,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             readme=stored_readme,
             io=stored_schema,
             avatar=stored_avatar,
-            examples=stored_examples,
             source_files=stored_source_files,
             module_name=self.module_name,
             class_name=self.class_name,
@@ -250,9 +241,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             io_data=ModelIOData.load_blobs(data.io),
             avatar=AvatarData.load_blobs(data.avatar),
             readme=MarkdownData.load_blobs(data.readme) if data.readme else None,
-            examples=[PredExampleData.load_blobs(e) for e in data.examples.values()]
-            if data.examples
-            else None,
             source_files=SourceFileCollection.load_blobs(data.source_files).files
             if data.source_files
             else None,

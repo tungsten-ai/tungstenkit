@@ -1,16 +1,17 @@
 import random
+import typing as t
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import patch
+from pathlib import PurePosixPath
 from uuid import uuid4
 
 import pytest
 
-from tungstenkit._internal import storables
-from tungstenkit._internal.storables import source_file_data
+from tungstenkit._internal import constants, storables
 from tungstenkit._internal.tungsten_clients import schemas
 from tungstenkit._internal.tungsten_clients.api_client import API_BASE_STR
 from tungstenkit._internal.utils import avatar, markdown
+
+from ..dummy_model import DUMMY_MODEL_DATA_DIR
 
 BASE_URL = "https://example.tungsten-ai.com"
 ACCESS_TOKEN = "exampletoken"
@@ -29,19 +30,16 @@ USER_GET_URL = f"{BASE_URL}{API_BASE_STR}/user"
 PROJECT_ID = random.randint(0, 10000)
 PROJECT_NAME = "exampleproject"
 PROJECT_FULLNAME = f"{USER_NAME}/exampleproject"
-PROJECT_BASE_URL = f"{BASE_URL}{API_BASE_STR}/projects/{PROJECT_FULLNAME}"
+PROJECT_GET_URL = f"{BASE_URL}{API_BASE_STR}/projects/{PROJECT_FULLNAME}"
 PROJECT_FILES_BASE_URL = f"{BASE_URL}{API_BASE_STR}/files/{PROJECT_ID}"
-PROJECT_FILE_UPLOAD_URL = f"{PROJECT_BASE_URL}/uploads"
-PROJECT_EXISTENCE_URL = f"{PROJECT_BASE_URL}/exists"
-PROJECT_AVATAR_URL = f"{PROJECT_BASE_URL}/avatar"
+PROJECT_FILE_UPLOAD_URL = f"{PROJECT_GET_URL}/uploads"
+PROJECT_AVATAR_URL = f"{PROJECT_GET_URL}/avatar"
 PROJECT_AVATAR_DATA_PNG = avatar.fetch_default_avatar_png("exampleproject@example.tungsten-ai.com")
 
-MODEL_BINARY_DIR = Path(__file__).parent.parent / "bin"
 MODEL_ID = random.randint(0, 10000)
 MODEL_VERSION = "exampleversion"
 MODEL_CREATED_AT = datetime.utcnow()
-MODEL_BASE_URL = f"{PROJECT_BASE_URL}/models"
-MODEL_POST_URL = f"{PROJECT_BASE_URL}/models"
+MODEL_POST_URL = f"{PROJECT_GET_URL}/models"
 MODEL_GET_URL = f"{MODEL_POST_URL}/{MODEL_VERSION}"
 MODEL_README_URL = f"{MODEL_GET_URL}/readme"
 MODEL_README_IMAGES_FOLDER = uuid4().hex
@@ -93,7 +91,7 @@ def dummy_model_in_server(
 
 @pytest.fixture(scope="session")
 def dummy_model_readme_in_server() -> str:
-    orig_readme_path = MODEL_BINARY_DIR / "markdown.md"
+    orig_readme_path = DUMMY_MODEL_DATA_DIR / "markdown.md"
     orig_readme = orig_readme_path.read_text()
     orig_readme_images = markdown.get_local_image_paths(orig_readme)
     images_in_server = [f"{MODEL_README_IMAGES_FOLDER_URL}/{im.name}" for im in orig_readme_images]
@@ -104,24 +102,32 @@ def dummy_model_readme_in_server() -> str:
 
 
 @pytest.fixture(scope="session")
-@patch.object(source_file_data, "MAX_SOURCE_FILE_SIZE", 10 * 1024)
-def dummy_model_source_tree_in_server() -> schemas.SourceTreeFolder:
-    def _add(folder: schemas.SourceTreeFolder, directory: Path):
-        for p in directory.glob("*"):
-            size = p.stat().st_size
-            skipped = size < source_file_data.MAX_SOURCE_FILE_SIZE
-            if p.is_file():
-                file = schemas.SourceTreeFile(name=p.name, size=size, skipped=skipped)
-                folder.contents.append(file)
-            elif p.is_dir():
-                new_folder = schemas.SourceTreeFolder(name=p.name)
-                d = directory / p.name
-                folder.contents.append(_add(new_folder, d))
-
-        return folder
-
+def dummy_model_source_tree_in_server(
+    dummy_model_all_source_files_dict: t.Dict[PurePosixPath, storables.SourceFile]
+) -> schemas.SourceTreeFolder:
     root = schemas.SourceTreeFolder(name="root")
-    return _add(root, MODEL_BINARY_DIR)
+
+    for file in dummy_model_all_source_files_dict.values():
+        folder = root
+        for part in file.rel_path_in_model_fs.parts[:-1]:
+            folder_exists = False
+            for c in folder.contents:
+                if c.name == part and c.type == "folder":
+                    folder = c
+                    folder_exists = True
+            if not folder_exists:
+                new_folder = schemas.SourceTreeFolder(name=part)
+                folder.contents.append(new_folder)
+                folder = new_folder
+
+        skipped = file.size > constants.MAX_SOURCE_FILE_SIZE
+        folder.contents.append(
+            schemas.SourceTreeFile(
+                name=file.rel_path_in_model_fs.name, size=file.size, skipped=skipped
+            )
+        )
+
+    return root
 
 
 __all__ = [

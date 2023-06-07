@@ -3,9 +3,12 @@ import shutil
 import tempfile
 import typing as t
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from pathspec import PathSpec
+
+if t.TYPE_CHECKING:
+    from _typeshed import StrPath
 
 
 def format_file_size(size_in_bytes: int, suffix="B"):
@@ -57,7 +60,7 @@ def get_tree_size_in_bytes(root_dir: Path, ignore_patterns: t.Optional[t.List[st
     )
 
 
-def is_relative_to(path: Path, start: Path):
+def is_relative_to(path: PurePath, start: "StrPath"):
     try:
         path.relative_to(start)
         return True

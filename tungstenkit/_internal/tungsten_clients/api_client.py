@@ -69,12 +69,14 @@ class TungstenAPIClient:
 
     def check_if_project_exists(self, project: str) -> bool:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "exists"
+        f.path = f.path / API_BASE_STR / "projects" / project
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
+        if resp.status_code == 404:
+            return False
+
         _check_resp(resp, f.url, f"Failed to check existence of project '{project}'")
-        parsed = schemas.Existence.parse_raw(resp.text)
-        return parsed.exists
+        return True
 
     def get_project_avatar(self, project: str) -> storables.AvatarData:
         f = furl(self.base_url)
@@ -145,7 +147,7 @@ class TungstenAPIClient:
                 desc="Downloading images in README",
             )
             md = change_img_links_in_markdown(
-                md, images=image_http_links, updates=[str(p) for p in downloaded]
+                md, images=image_http_links, updates=[p.as_uri() for p in downloaded]
             )
             return storables.MarkdownData(content=md, image_files=downloaded)
         return storables.MarkdownData(content=md)
@@ -184,31 +186,30 @@ class TungstenAPIClient:
         ret: t.List[storables.SourceFile] = []
 
         def _add(path: t.Optional[PurePosixPath], folder: schemas.SourceTreeFolder):
-            while True:
-                contents = folder.contents
-                for c in contents:
-                    p = path / c.name if path else PurePosixPath(c.name)
-                    if c.type == "file":
-                        if c.skipped:
-                            downloaded = None
-                        else:
-                            if path is None:
-                                downloaded = root_dir / c.name
-                            else:
-                                downloaded = root_dir / path / c.name
-
-                            urls.append(self._build_source_file_url(project, version, str(p)))
-                            download_paths.append(downloaded)
-
-                        ret.append(
-                            storables.SourceFile(
-                                rel_path_in_model_fs=p,
-                                abs_path_in_host_fs=downloaded,
-                                size=c.size,
-                            )
-                        )
+            contents = folder.contents
+            for c in contents:
+                p = path / c.name if path else PurePosixPath(c.name)
+                if c.type == "file":
+                    if c.skipped:
+                        downloaded = None
                     else:
-                        _add(p, c)
+                        if path is None:
+                            downloaded = root_dir / c.name
+                        else:
+                            downloaded = root_dir / path / c.name
+
+                        urls.append(self._build_source_file_url(project, version, str(p)))
+                        download_paths.append(downloaded)
+
+                    ret.append(
+                        storables.SourceFile(
+                            rel_path_in_model_fs=p,
+                            abs_path_in_host_fs=downloaded,
+                            size=c.size,
+                        )
+                    )
+                else:
+                    _add(p, c)
 
         _add(None, root)
         self.download_multiple_files(urls, download_paths)

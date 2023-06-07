@@ -4,9 +4,11 @@ from pathlib import Path
 
 from tungstenkit import BaseIO, Field, Image, Option, define_model
 
-BUILD_DIR = Path(__file__).parent
-README_PATH = BUILD_DIR / "bin" / "markdown.md"
-INCLUDE_FILES = ["./dummy_model.py", "./bin"]
+DUMMY_MODEL_MODULE_PATH = Path(__file__)
+DUMMY_MODEL_BUILD_DIR = DUMMY_MODEL_MODULE_PATH.parent
+DUMMY_MODEL_DATA_DIR = DUMMY_MODEL_BUILD_DIR / "dummy_model_data"
+DUMMY_MODEL_README_PATH = DUMMY_MODEL_DATA_DIR / "markdown.md"
+DUMMY_MODEL_INCLUDE_FILES = ["./dummy_model.py", DUMMY_MODEL_DATA_DIR.name]
 
 
 class DummyInput(BaseIO):
@@ -26,8 +28,8 @@ class DummyOutput(BaseIO):
     input=DummyInput,
     output=DummyOutput,
     batch_size=4,
-    readme_md=str(README_PATH),
-    include_files=INCLUDE_FILES,
+    readme_md=str(DUMMY_MODEL_README_PATH),
+    include_files=DUMMY_MODEL_INCLUDE_FILES,
 )
 class DummyModel:
     failure: bool = False

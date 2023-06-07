@@ -15,7 +15,9 @@ from rich.progress import Progress, TextColumn
 
 import tungstenkit
 from tungstenkit import exceptions
+from tungstenkit._internal import storables
 from tungstenkit._internal.configs import BuildConfig
+from tungstenkit._internal.constants import TUNGSTEN_DIR_IN_CONTAINER
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
 from tungstenkit._internal.utils.context import change_workingdir, hide_traceback
 from tungstenkit._internal.utils.file import (
@@ -29,20 +31,16 @@ from .dockerfiles import BaseDockerfile
 TMP_DIR_PREFIX = ".tungsten-build-"
 
 
-@attrs.frozen(kw_only=True)
-class SourceFile:
-    abs_path_in_host_fs: Path
-    rel_path_in_model_fs: PurePosixPath
-
-
 @attrs.define
 class BuildContext:
     config: BuildConfig
     root_dir: Path
     dockerfile_path: Path
 
-    @property
-    def files(self) -> t.Generator[SourceFile, None, None]:
+    def walk_fs(self) -> t.Generator[storables.SourceFile, None, None]:
+        """
+        Yield files under ``TUNGSTEN_DIR_IN_CONTAINER`` in container fs
+        """
         abs_root_dir = self.root_dir.resolve()
         include_spec = PathSpec.from_lines("gitwildmatch", self.config.include_files)
         exclude_spec = PathSpec.from_lines(
@@ -52,15 +50,41 @@ class BuildContext:
         for rel_path_str in include_spec.match_tree(self.root_dir, follow_links=False):
             posix_rel_path_str = Path(rel_path_str).as_posix()
             if not exclude_spec.match_file(posix_rel_path_str):
-                yield SourceFile(
-                    abs_path_in_host_fs=abs_root_dir / rel_path_str,
+                abs_path_in_host_fs = abs_root_dir / rel_path_str
+                size = (
+                    abs_path_in_host_fs.lstat().st_size
+                    if abs_path_in_host_fs.is_symlink()
+                    else abs_path_in_host_fs.stat().st_size
+                )
+                yield storables.SourceFile(
+                    abs_path_in_host_fs=abs_path_in_host_fs,
                     rel_path_in_model_fs=PurePosixPath(posix_rel_path_str),
+                    size=size,
                 )
         if self.config.copy_files:
             for pathstr_in_host_fs, pathstr_in_model_fs in self.config.copy_files:
-                path_in_host_fs = Path(pathstr_in_host_fs)
-                if not path_in_host_fs.is_absolute():
-                    path_in_host_fs = abs_root_dir / path_in_host_fs
+                abs_path_in_host_fs = Path(pathstr_in_host_fs)
+                if not abs_path_in_host_fs.is_absolute():
+                    abs_path_in_host_fs = abs_root_dir / abs_path_in_host_fs
+
+                path_in_model_fs = PurePosixPath(pathstr_in_model_fs)
+                if path_in_model_fs.is_absolute():
+                    if not is_relative_to(path_in_model_fs, TUNGSTEN_DIR_IN_CONTAINER):
+                        continue
+                    rel_path_in_model_fs = path_in_model_fs.relative_to(TUNGSTEN_DIR_IN_CONTAINER)
+                else:
+                    rel_path_in_model_fs = path_in_model_fs
+
+                size = (
+                    abs_path_in_host_fs.lstat().st_size
+                    if abs_path_in_host_fs.is_symlink()
+                    else abs_path_in_host_fs.stat().st_size
+                )
+                yield storables.SourceFile(
+                    abs_path_in_host_fs=abs_path_in_host_fs,
+                    rel_path_in_model_fs=rel_path_in_model_fs,
+                    size=size,
+                )
 
     def build(self, tags: t.List[str]) -> None:
         subprocess_args = [

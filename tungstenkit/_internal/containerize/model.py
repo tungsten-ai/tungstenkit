@@ -5,7 +5,6 @@ from pathlib import Path
 from tungstenkit._internal import storables
 from tungstenkit._internal.constants import DEFAULT_MODEL_MODULE, default_model_repo
 from tungstenkit._internal.model_def_loader import create_model_def_loader
-from tungstenkit._internal.utils import markdown
 from tungstenkit._internal.utils.context import change_syspath
 from tungstenkit._internal.utils.docker import parse_docker_image_name
 
@@ -22,7 +21,7 @@ def build_model(
     class_name: t.Optional[str] = None,
     copy_files: t.Optional[t.List[t.Tuple[str, str]]] = None,
     name: t.Optional[str] = None,
-) -> storables.StoredModelData:
+) -> storables.ModelData:
     abs_path_to_build_dir = Path(build_dir).resolve()
     with change_syspath(build_dir):
         # Load model definition
@@ -67,17 +66,16 @@ def build_model(
             )
             avatar = storables.AvatarData.fetch_default(hash_key=model_name)
             if model_config.readme_md:
-                readme_content = model_config.readme_md.read_text()
-                readme_content = markdown.convert_local_image_paths_to_absolute(
-                    readme_content, base_dir=model_config.readme_md.parent.absolute()
-                )
-                image_file_paths = markdown.get_local_image_paths(readme_content)
-                readme = storables.MarkdownData(
-                    content=readme_content, image_files=image_file_paths
-                )
+                readme = storables.MarkdownData.from_path(model_config.readme_md)
             else:
                 readme = None
             model_data = storables.ModelData(
-                name=model_name, io_data=io_schema, avatar=avatar, readme=readme, id=id
+                name=model_name,
+                io_data=io_schema,
+                avatar=avatar,
+                readme=readme,
+                id=id,
+                source_files=build_ctx.walk_fs(),
             )
-            return model_data.save()
+            model_data.save()
+            return storables.ModelData.load(model_name)

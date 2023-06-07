@@ -73,8 +73,8 @@ class TungstenClient:
         model_name: str,
         project: str,
     ) -> schemas.Model:
-        # if not self.api.check_if_project_exists(project):
-        # raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
+        if not self.api.check_if_project_exists(project):
+            raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
 
         model = storables.ModelData.load(model_name)
         docker_image_id = model.docker_image_id
@@ -112,6 +112,7 @@ class TungstenClient:
                 source_files=source_files,
                 skipped_source_files=skipped_source_files,
             )
+
             model_in_server = self.api.create_model(project=project, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
 

@@ -141,9 +141,13 @@ class TungstenClientConfig(BaseModel):
             tmp_config_path = Path(tmp_config_path_str)
             with FileLock(lock_path, timeout=30.0):
                 tmp_config_path.write_text(dumped)
+                os.close(tmp_config_fd)
                 os.replace(tmp_config_path, path)
         finally:
-            os.close(tmp_config_fd)
+            try:
+                os.close(tmp_config_fd)
+            except OSError:
+                pass
 
     @staticmethod
     def from_env(path: t.Optional[Path] = None) -> "TungstenClientConfig":

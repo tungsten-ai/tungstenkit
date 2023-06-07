@@ -205,30 +205,24 @@ def download_files_in_threadpool(
     if len(urls) == 0:
         return []
 
-    unique_urls = list(set(urls))
-    unique_url_indices = [unique_urls.index(url) for url in urls]
-    download_paths: t.List[Path] = []
-
     if isinstance(out, Path):
+        download_paths = []
         # Download all files in out_path
         if out.exists() and not out.is_dir():
             raise ValueError(f"Not a directory: {out}")
         out.mkdir(exist_ok=True, parents=True)
-        for filename in [get_filename_from_uri(url) for url in unique_urls]:
-            filepath = out / filename
+        for filename in [get_filename_from_uri(url) for url in urls]:
+            filepath = (out / filename).resolve()
             if filepath.exists():
                 filepath = convert_to_unique_path(filepath)
             filepath.touch()
             download_paths.append(filepath)
     else:
-        if len(download_paths) != len(urls):
-            raise ValueError("# urls != # download paths")
+        download_paths = [d.resolve() for d in out]
+        assert len(download_paths) == len(urls), "# urls != # download paths"
         path_pairs = combinations(out, 2)
         for p1, p2 in path_pairs:
-            if p1 == p2:
-                raise ValueError(f"Path duplication: {p1}")
-
-        download_paths.extend(out)
+            assert p1 != p2, f"Path duplication: {p1}"
 
     with ExitStack() as exit_stack:
         if progress_bar:
@@ -246,7 +240,7 @@ def download_files_in_threadpool(
 
         fut_list: t.List[Future] = []
         with ThreadPoolExecutor(max_workers=8) as executor:
-            for url, download_path in zip(unique_urls, download_paths):
+            for url, download_path in zip(urls, download_paths):
                 fut = executor.submit(
                     _download_file,
                     url=url,
@@ -260,7 +254,7 @@ def download_files_in_threadpool(
             for fut in fut_list:
                 fut.result()
 
-    return [download_paths[unique_url_indices[i]] for i in range(len(urls))]
+    return download_paths
 
 
 def download_file(

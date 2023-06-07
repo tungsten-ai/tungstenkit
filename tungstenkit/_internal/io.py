@@ -178,18 +178,8 @@ class File(BaseModel):
     def __modify_schema__(
         cls, field_schema: t.Dict[str, t.Any], field: t.Optional[ModelField]
     ) -> None:
-        if contexts.APP == contexts.Application.MODEL_SERVER:
-            field_schema["type"] = "string"
-            field_schema["format"] = "uri"
-        else:
-            # TODO remove this
-            # legacy: old version schema
-            ref = cls._schema_prefix + cls.__name__
-            if field and field.field_info.description:
-                field_schema["allOf"] = [{"$ref": ref}]
-                field_schema["description"] = field.field_info.description
-            else:
-                field_schema["$ref"] = cls._schema_prefix + cls.__name__
+        field_schema["type"] = "string"
+        field_schema["format"] = "uri"
 
     @classmethod
     def _get_typeenum(cls) -> FileType:

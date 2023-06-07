@@ -5,10 +5,19 @@ import tempfile
 
 import pytest
 
-# Prepare data dir
+# Prepare app dirs
 data_dir = tempfile.mkdtemp(prefix="tungstenkit-test-")
+config_dir = tempfile.mkdtemp(prefix="tungstenkit-test-")
 os.environ["TUNGSTEN_DATA_DIR"] = data_dir
+os.environ["TUNGSTEN_CONFIG_DIR"] = config_dir
 atexit.register(shutil.rmtree, data_dir)
+atexit.register(shutil.rmtree, config_dir)
+
+# Patch max source file size
+from tungstenkit._internal import constants  # noqa
+
+constants.MAX_SOURCE_FILE_SIZE = 10 * 1024
+
 
 # Load fixtures
 from .containerize.fixtures import *  # noqa

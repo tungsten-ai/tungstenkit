@@ -70,6 +70,7 @@ python-multipart = "^0.0.6"
 urllib3 = "^1.26"
 dill = "^0.3.6"
 appdirs = "^1.4.4"
+pynvml = "^11.5.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.1"
@@ -88,6 +89,7 @@ types-tabulate = "^0.9.0.0"
 types-markdown = "^3.4.2.5"
 pytest-timeout = "^2.1.0"
 jsonschema = "^4.17.3"
+responses = "^0.23.1"
 
 [tool.isort]
 multi_line_output = 3

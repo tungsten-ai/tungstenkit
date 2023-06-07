@@ -3,8 +3,8 @@ from pathlib import Path, PurePosixPath
 
 import attrs
 
+from tungstenkit._internal import constants
 from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
-from tungstenkit._internal.constants import MAX_SOURCE_FILE_SIZE
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 
 
@@ -71,10 +71,10 @@ class SourceFileCollection(BlobStorable[SerializedSourceFileCollection]):
             if not isinstance(f, SourceFile):
                 raise TypeError(f"expected 'SourceFile', not {type(f)}")
 
-            if f.size > MAX_SOURCE_FILE_SIZE:
-                f.abs_path_in_host_fs = None
-
-            self.add(f)
+            if f.size > constants.MAX_SOURCE_FILE_SIZE:
+                self.add(SourceFile(rel_path_in_model_fs=f.rel_path_in_model_fs, size=f.size))
+            else:
+                self.add(f)
 
     def add(self, file: SourceFile) -> None:
         self.files.add(file)
