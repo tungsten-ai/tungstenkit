@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "tungstenkit"
-version = "0.0.1"
-description = "Tungstenkit: Developer-friendly container toolkit for machine learning"
+version = "0.1.0"
+description = "ML container made simple"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
 homepage = "https://github.com/tungsten-ai/tungstenkit"
 readme = ["README.md"]
 packages = [{include = "tungstenkit"}]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Intended Audience :: Science/Research",
