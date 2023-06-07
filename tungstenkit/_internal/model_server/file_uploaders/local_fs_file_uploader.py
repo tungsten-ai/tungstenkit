@@ -3,8 +3,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from uuid import uuid4
 
-from furl import furl
-
 from tungstenkit._internal import io
 from tungstenkit._internal.utils.uri import get_path_from_file_url
 
@@ -38,8 +36,7 @@ class LocalFSFileUploader(AbstractFileUploader):
 
     def _save(self, idx: int, file: io.File) -> t.Tuple[int, Path]:
         file_uri = io.URIForFile(file.__root__).to_file_uri()
-        f = furl(file_uri)
-        path = get_path_from_file_url(f)
+        path = get_path_from_file_url(file_uri)
         return idx, path
 
     def _copy(self, src: Path, dest: Path) -> Path:

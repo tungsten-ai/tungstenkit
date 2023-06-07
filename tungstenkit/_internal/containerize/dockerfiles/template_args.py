@@ -32,4 +32,3 @@ class TemplateArgs:
     tungstenkit_dir_in_container: PurePosixPath = attrs.field(default=TUNGSTEN_DIR_IN_CONTAINER)
     home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
     copy_files: t.List[t.Tuple[str, str]] = attrs.field(factory=list)
-    description: str = attrs.field(factory=str)

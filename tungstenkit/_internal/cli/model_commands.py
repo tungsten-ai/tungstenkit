@@ -157,7 +157,6 @@ def list_models(**kwargs):
     table_headers = [
         "Repository",
         "Tag",
-        "Description",
         "Model Class",
         "Created",
         "Docker Image ID",
@@ -168,7 +167,6 @@ def list_models(**kwargs):
             [
                 m.repo_name,
                 m.tag,
-                m.description,
                 f"{m.module_name}:{m.class_name}",
                 m.created_at.replace(tzinfo=timezone.utc)
                 .astimezone()

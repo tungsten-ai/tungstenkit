@@ -164,12 +164,11 @@ def _add_endpoints(
         return cancel(prediction_id)
 
 
-def _setup_openapi(app: FastAPI, description: t.Optional[str] = None):
+def _setup_openapi(app: FastAPI):
     # TODO use user-defined readme here
     openapi_schema = get_openapi(
         title=OPENAPI_TITLE,
         version=str(pkg_version),
-        description=description,
         routes=app.routes,
     )
     app.openapi_schema = openapi_schema

@@ -52,13 +52,11 @@ class BuildConfig(BaseModel):
     mem_gb: int = 8
     gpu_mem_gb: int = 16
 
-    description: str = Field(default_factory=str)
     python_packages: t.List[str] = Field(default_factory=list)
     include_files: t.List[str] = Field(default_factory=_default_include_files)
     copy_files: t.List[t.Tuple[str, str]] = Field(default_factory=list)
     exclude_files: t.List[str] = Field(default_factory=_default_exclude_files)
     pip_wheels: t.List[Path] = Field(default_factory=list)
-    conda_environment_yml: t.Optional[Path] = None
     environment_variables: t.Dict[str, str] = Field(default_factory=dict)
 
     system_packages: t.List[str] = Field(default_factory=list)

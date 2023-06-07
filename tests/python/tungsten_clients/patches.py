@@ -130,7 +130,6 @@ def patch_dummy_model_data_in_image(dummy_model_data: storables.ModelData):
         module_name=dummy_model_data.module_name,
         class_name=dummy_model_data.class_name,
         docker_image_id=dummy_model_data.docker_image_id,
-        description=dummy_model_data.description,
         batch_size=dummy_model_data.batch_size,
         device=dummy_model_data.device,
         gpu_mem_gb=dummy_model_data.gpu_mem_gb,

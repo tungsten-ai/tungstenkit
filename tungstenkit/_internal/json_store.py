@@ -10,6 +10,7 @@ from filelock import FileLock
 from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
+from tungstenkit._internal.logging import log_debug
 from tungstenkit._internal.utils.file import write_safely
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 from tungstenkit._internal.utils.string import camel_to_snake
@@ -156,7 +157,8 @@ class JSONCollection(t.Generic[ItemType]):
         item = col.get_by_tag(repo, tag)
         if item is None:
             self._raise_not_found_by_name(repo + ":" + tag)
-        return item  # type: ignore
+        attrs_kwargs = {k: v for k, v in attrs.asdict(item, recurse=False).items() if k != "tag"}
+        return self._item_type(tag=tag, **attrs_kwargs)  # type: ignore
 
     # TODO Take fields argument
     def list(self) -> t.List[ItemType]:
@@ -164,10 +166,12 @@ class JSONCollection(t.Generic[ItemType]):
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
 
-        for repo_name in col.repositories.keys():
-            for id in col.repositories[repo_name].values():
-                d = col.items[id]
-                ret.append(d)
+        items = col.list()
+        for _, tag, item in items:
+            attrs_kwargs = {
+                k: v for k, v in attrs.asdict(item, recurse=False).items() if k != "tag"
+            }
+            ret.append(self._item_type(tag=tag, **attrs_kwargs))  # type: ignore
 
         return ret
 
@@ -252,12 +256,21 @@ class _JSONCollection(t.Generic[ItemType]):
     def get_by_tag(self, repo_name: str, tag: str) -> t.Optional[ItemType]:
         if repo_name not in self.repositories or tag not in self.repositories[repo_name]:
             return None
-        return self.items[self.repositories[repo_name][tag]]
+        item = self.items[self.repositories[repo_name][tag]]
+        return item
 
     def get_by_id(self, id: str) -> t.Optional[ItemType]:
         if id not in self.items:
             return None
         return self.items[id]
+
+    def list(self) -> t.List[t.Tuple[str, str, ItemType]]:
+        ret = []
+        for repo_name in self.repositories.keys():
+            for tag, id in self.repositories[repo_name].items():
+                item = self.items[id]
+                ret.append((repo_name, tag, item))
+        return ret
 
     def prune(
         self, candidate_ids: t.Optional[t.Iterable[str]] = None
@@ -295,6 +308,7 @@ class _JSONCollection(t.Generic[ItemType]):
             removed.cleanup()
 
     def save(self, path: Path):
+        log_debug(f"Save JSON collection to '{path}'")
         serialized = convert_attrs_to_json(self)
         write_safely(path, serialized)
 
@@ -309,6 +323,7 @@ class _JSONCollection(t.Generic[ItemType]):
             col = load_attrs_from_json(cls[item_type], path)  # type: ignore
         except cattrs.errors.ClassValidationError:
             cls._raise_data_parse_error(path)
+        log_debug(f"Load JSON collection from '{path}'")
         return col
 
     @classmethod

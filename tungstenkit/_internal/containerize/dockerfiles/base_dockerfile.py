@@ -144,7 +144,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             pip_wheels_in_build_ctx=self.config.pip_wheels,
             env_vars=self.config.environment_variables,
             copy_files=self.config.copy_files,
-            description=self.config.description,
             device="gpu" if self.config.gpu else "cpu",
             tungstenkit_dir_in_build_ctx=tungstenkit_dir_in_build_ctx,
         )

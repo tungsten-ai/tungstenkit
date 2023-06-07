@@ -10,6 +10,3 @@ LABEL device="{{ device }}"
 {% if gpu_mem_gb %}
 LABEL gpu_mem_gb="{{ gpu_mem_gb }}"
 {% endif %}
-{% if description|length > 0 %}
-LABEL description="{{ description }}"
-{% endif %}

@@ -71,7 +71,11 @@ class SourceFileCollection(BlobStorable[SerializedSourceFileCollection]):
             if not isinstance(f, SourceFile):
                 raise TypeError(f"expected 'SourceFile', not {type(f)}")
 
-            if f.size > constants.MAX_SOURCE_FILE_SIZE:
+            if (
+                f.abs_path_in_host_fs is None
+                or f.size > constants.MAX_SOURCE_FILE_SIZE
+                or f.abs_path_in_host_fs.is_symlink()
+            ):
                 self.add(SourceFile(rel_path_in_model_fs=f.rel_path_in_model_fs, size=f.size))
             else:
                 self.add(f)

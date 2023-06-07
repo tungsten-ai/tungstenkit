@@ -24,7 +24,6 @@ class _ModelDataInImage:
     module_name: str
     class_name: str
     docker_image_id: str
-    description: str
     batch_size: int
     device: str
     gpu_mem_gb: t.Optional[int]
@@ -43,7 +42,6 @@ class _ModelDataInImage:
         labels: t.Optional[t.Dict[str, str]] = docker_image.attrs["Config"]["Labels"]
         module_name = "tungsten_model"
         class_name = "Model"
-        description = "Model"
         batch_size = 1
         device = "cpu"
         gpu_mem_gb = None
@@ -61,9 +59,7 @@ class _ModelDataInImage:
                     batch_size = int(val)
         if labels:
             for label_name, label_value in labels.items():
-                if label_name == "description":
-                    description = label_value
-                elif label_name == "device":
+                if label_name == "device":
                     device = label_value
                 elif label_name == "gpu_mem_gb":
                     gpu_mem_gb = int(label_value)
@@ -72,7 +68,6 @@ class _ModelDataInImage:
             module_name=module_name,
             class_name=class_name,
             docker_image_id=docker_image_id,
-            description=description,
             batch_size=batch_size,
             device=device,
             gpu_mem_gb=gpu_mem_gb,
@@ -226,7 +221,6 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             module_name=self.module_name,
             class_name=self.class_name,
             docker_image_id=self.docker_image_id,
-            description=self.description,
             batch_size=self.batch_size,
             device=self.device,
             gpu_mem_gb=self.gpu_mem_gb,

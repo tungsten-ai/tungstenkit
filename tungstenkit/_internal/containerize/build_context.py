@@ -19,7 +19,7 @@ from tungstenkit._internal import storables
 from tungstenkit._internal.configs import BuildConfig
 from tungstenkit._internal.constants import TUNGSTEN_DIR_IN_CONTAINER
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
-from tungstenkit._internal.utils.context import change_workingdir, hide_traceback
+from tungstenkit._internal.utils.context import hide_traceback
 from tungstenkit._internal.utils.file import (
     format_file_size,
     get_tree_size_in_bytes,
@@ -115,13 +115,13 @@ def setup_build_ctx(
     module_path: Path,
     dockerfile_generator: BaseDockerfile,
 ):
-    abs_path_to_build_dir = build_dir.resolve()
-    module_path = module_path.resolve()
+    assert build_dir.is_absolute()
+    assert module_path.is_absolute()
     try:
-        rel_path_to_module = module_path.relative_to(abs_path_to_build_dir)
+        rel_path_to_module = module_path.relative_to(build_dir)
     except ValueError:
         raise exceptions.BuildError(
-            f"Python module '{module_path}' is outside build dir at '{abs_path_to_build_dir}'"
+            f"Python module '{module_path}' is outside build dir at '{build_dir}'"
         )
 
     log_info(
@@ -130,75 +130,70 @@ def setup_build_ctx(
         f"\n exclude_files: {build_config.exclude_files}\n"
     )
     build_config.include_files.append(("/" / rel_path_to_module).as_posix())
-    with change_workingdir(build_dir):
-        with tempfile.TemporaryDirectory(prefix=".tungsten-build-", dir=build_dir) as tmp_dir_str:
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                rel_path_to_tmp_dir = (
-                    Path(tmp_dir_str).resolve().relative_to(abs_path_to_build_dir)
-                )
-                rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
-                rel_path_to_dockerignore = rel_path_to_tmp_dir / "Dockerfile.dockerignore"
-                rel_path_to_tungstenkit = rel_path_to_tmp_dir / "tungstenkit"
-                rel_path_to_tungstenkit.mkdir()
-                future_list: t.List[Future] = []
+    with tempfile.TemporaryDirectory(prefix=".tungsten-build-", dir=build_dir) as tmp_dir_str:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            rel_path_to_tmp_dir = Path(tmp_dir_str).resolve().relative_to(build_dir)
+            rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
+            rel_path_to_dockerignore = rel_path_to_tmp_dir / "Dockerfile.dockerignore"
+            rel_path_to_tungstenkit = rel_path_to_tmp_dir / "tungstenkit"
+            rel_path_to_tungstenkit.mkdir()
+            future_list: t.List[Future] = []
 
-                dockerignore = _generate_dockerignore(
-                    build_dir=build_dir,
+            dockerignore = _generate_dockerignore(
+                build_dir=build_dir,
+                include_patterns=build_config.include_files,
+                exclude_patterns=build_config.exclude_files,
+            )
+            dockerignore_path = build_dir / rel_path_to_dockerignore
+            dockerignore_path.write_text(dockerignore)
+            _copy_tungstenkit(
+                build_dir=build_dir,
+                rel_path_to_tungstenkit=rel_path_to_tungstenkit,
+                executor=executor,
+                future_list=future_list,
+            )
+            build_config.copy_files.extend(
+                _convert_abs_symlinks_to_rel(
+                    build_dir,
                     include_patterns=build_config.include_files,
                     exclude_patterns=build_config.exclude_files,
+                    rel_path_to_tmp_dir=rel_path_to_tmp_dir,
                 )
-                dockerignore_path = build_dir / rel_path_to_dockerignore
-                dockerignore_path.write_text(dockerignore)
-                _copy_tungstenkit(
-                    build_dir=build_dir,
-                    rel_path_to_tungstenkit=rel_path_to_tungstenkit,
+            )
+            if build_config.copy_files:
+                build_config.copy_files = _copy_files(
+                    abs_path_to_build_dir=build_dir,
+                    rel_path_to_tmp_dir=rel_path_to_tmp_dir,
+                    include_with_dest=build_config.copy_files,
                     executor=executor,
                     future_list=future_list,
                 )
-                build_config.copy_files.extend(
-                    _convert_abs_symlinks_to_rel(
-                        abs_path_to_build_dir,
-                        include_patterns=build_config.include_files,
-                        exclude_patterns=build_config.exclude_files,
-                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                    )
-                )
-                if build_config.copy_files:
-                    build_config.copy_files = _copy_files(
-                        abs_path_to_build_dir=abs_path_to_build_dir,
-                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                        include_with_dest=build_config.copy_files,
-                        executor=executor,
-                        future_list=future_list,
-                    )
-                    _show_progress_while_copying_files(
-                        copy_dir=rel_path_to_tmp_dir,
-                        future_list=future_list,
-                        ignore_patterns=["tungstenkit"],
-                    )
-
-                dockerfile = dockerfile_generator.generate(
-                    tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
-                    tungstenkit_dir_in_build_ctx=rel_path_to_tungstenkit,
-                )
-                dockerfile_path = build_dir / rel_path_to_dockerfile
-                dockerfile_path.write_text(dockerfile)
-                log_debug(
-                    "Dockerfile:\n"
-                    + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
-                    pretty=False,
-                )
-                log_debug(
-                    ".dockerignore:\n"
-                    + "\n".join(
-                        ["  " + line for line in dockerignore.strip().split("\n") if line]
-                    ),
-                    pretty=False,
+                _show_progress_while_copying_files(
+                    copy_dir=rel_path_to_tmp_dir,
+                    future_list=future_list,
+                    ignore_patterns=["tungstenkit"],
                 )
 
-                yield BuildContext(
-                    config=build_config, root_dir=build_dir, dockerfile_path=dockerfile_path
-                )
+            dockerfile = dockerfile_generator.generate(
+                tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
+                tungstenkit_dir_in_build_ctx=rel_path_to_tungstenkit,
+            )
+            dockerfile_path = build_dir / rel_path_to_dockerfile
+            dockerfile_path.write_text(dockerfile)
+            log_debug(
+                "Dockerfile:\n"
+                + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
+                pretty=False,
+            )
+            log_debug(
+                ".dockerignore:\n"
+                + "\n".join(["  " + line for line in dockerignore.strip().split("\n") if line]),
+                pretty=False,
+            )
+
+            yield BuildContext(
+                config=build_config, root_dir=build_dir, dockerfile_path=dockerfile_path
+            )
 
 
 def _generate_dockerignore(
