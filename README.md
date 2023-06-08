@@ -4,32 +4,12 @@
 [![Downloads](https://static.pepy.tech/badge/tungstenkit?style=flat-square)](https://pypi.org/project/tungstenkit/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/tungstenkit.svg?color=%2334D058)](https://pypi.org/project/tungstenkit/)
 
-[Installation](#prerequisites) | [Features](#features) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
+[Features](#features) | [Installation](#prerequisites) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
 
-**Tungstenkit** is ML containerization tool with a focus on developer productivity and versatility. 
+Tungstenkit is ML containerization tool with a focus on developer productivity and versatility.
 
-Have you ever struggled to use models from github?
-You may have repeated tedious steps like: cuda/dependency problems, file handling, and scripting for testing.
+The key features are:
 
-Standing on the shoulder of Docker, this project aims to make using ML models less painful by adding functionalities for typical use cases - REST API server, GUI, CLI, and Python script.
-
-With Tungstenkit, sharing and consuming ML models can be quick and enjoyable.
-
-
-## Prerequisites
-- Python 3.7+
-- [Docker](https://docs.docker.com/get-docker/)
-- (Optional) For using GPUs,
-    - Linux: [nvidia-container-runtime](https://docs.docker.com/config/containers/resource_constraints/#access-an-nvidia-gpu)
-    - Windows: [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/windows/wsl/#turn-on-docker-desktop-wsl-2)
-
-
-## Installation
-```shell
-pip install tungstenkit
-```
-
-## Features
 - [Requires only a few lines of Python code](#requires-only-a-few-lines-of-python-code)
 - [Build once, use everywhere](#build-once-use-everywhere):
     - [REST API server](#rest-api-server)
@@ -37,9 +17,9 @@ pip install tungstenkit
     - [CLI application](#cli-application)
     - [Python function](#python-function)
 - [Framework-agnostic and lightweight](#framework-agnostic-and-lightweight)
+- [Batched prediction](#batched-prediction)
 - [Pydantic input/output definitions with convenient file handling](#pydantic-inputoutput-definitions-with-convenient-file-handling)
-- [Supports batched prediction](#supports-batched-prediction)
-- Supports clustering with distributed machines (coming soon)
+- Clustering with distributed machines (coming soon)
 
 ## Take the tour
 ### Requires only a few lines of python code
@@ -169,6 +149,38 @@ class Model:
         return outputs
 ```
 
+### Batched prediction
+Tungstenkit supports both server-side and client-side batching.
+
+- **Server-side batching**  
+    <!-- Explain more? Mention hashing? -->
+    A server groups inputs across multiple requests and processes them together.
+    You can configure the max batch size:
+    ```python
+    @define_model(input=Input, output=Output, gpu=True, batch_size=32)
+    ```
+    The max batch size can be changed when running a server:
+    ```console
+    $ docker run -p 3000:3000 --gpus all model:latest --batch-size 64 
+    ```
+
+- **Client-side batching**  
+    Also, you can reduce traffic volume by putting multiple inputs in a single prediction request:
+    ```console
+    $ curl -X 'POST' 'http://localhost:3000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -d '[{"field": "input1"}, {"field": "input2"}, {"field": "input3"}]'
+
+    {
+      "outputs": [
+        {"field": "output1"},
+        {"field": "output2"},
+        {"field": "output3"}
+      ]
+    }
+    ```
+
 ### Pydantic input/output definitions with convenient file handling
 Let's look at the example below:
 ```python
@@ -204,37 +216,17 @@ class StyleTransferModel:
         return outputs
 ```
 
-### Supports batched prediction
-Tungstenkit supports both server-side and client-side batching.
+## Prerequisites
+- Python 3.7+
+- [Docker](https://docs.docker.com/get-docker/)
+- (Optional) For using GPUs,
+    - Linux: [nvidia-container-runtime](https://docs.docker.com/config/containers/resource_constraints/#access-an-nvidia-gpu)
+    - Windows: [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/windows/wsl/#turn-on-docker-desktop-wsl-2)
 
-- **Server-side batching**  
-    <!-- Explain more? Mention hashing? -->
-    A server groups inputs across multiple requests and processes them together.
-    You can configure the max batch size:
-    ```python
-    @define_model(input=Input, output=Output, gpu=True, batch_size=32)
-    ```
-    The max batch size can be changed when running a server:
-    ```console
-    $ docker run -p 3000:3000 --gpus all model:latest --batch-size 64 
-    ```
-
-- **Client-side batching**  
-    Also, you can reduce traffic volume by putting multiple inputs in a single prediction request:
-    ```console
-    $ curl -X 'POST' 'http://localhost:3000/predict' \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -d '[{"field": "input1"}, {"field": "input2"}, {"field": "input3"}]'
-
-    {
-      "outputs": [
-        {"field": "output1"},
-        {"field": "output2"},
-        {"field": "output3"}
-      ]
-    }
-    ```
+## Installation
+```shell
+pip install tungstenkit
+```
 
 ## Documentation
 - [Getting Started](https://tungsten-ai.github.io/docs/getting_started)
