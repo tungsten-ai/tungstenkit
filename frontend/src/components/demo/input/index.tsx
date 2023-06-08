@@ -20,6 +20,7 @@ import { AppState } from "@/redux/store";
 const buildInputComponent = (
   propName: string,
   propObj: inputProp,
+  isFileField: boolean,
   requiredArray: string [],
   components: JSX.Element[],
   control: Control<FieldValues>,
@@ -48,17 +49,7 @@ const buildInputComponent = (
     errors,
   };
 
-  if (choices && inputTypesWithSelectOption.includes(propObj.type as string)) {
-    // Select
-    components.push(
-      <Controller
-        {...controllerProps}
-        render={({ field: { onChange, value } }) => (
-          <InputSelect {...inputProps} value={value} onChange={onChange} />
-        )}
-      />,
-    );
-  } else if (propObj.allOf) {  //TODO: check if .allOf is correct method of branching to media
+  if (isFileField) {  //TODO: check if .allOf is correct method of branching to media
     // Image
     components.push(
       <Controller
@@ -79,6 +70,16 @@ const buildInputComponent = (
             />
           );
         }}
+      />,
+    );
+  } else if (choices && inputTypesWithSelectOption.includes(propObj.type as string)) {
+    // Select
+    components.push(
+      <Controller
+        {...controllerProps}
+        render={({ field: { onChange, value } }) => (
+          <InputSelect {...inputProps} value={value} onChange={onChange} />
+        )}
       />,
     );
   } else if (propObj.type === "string") {
@@ -153,9 +154,10 @@ const buildAllInputComponents = (
   if (model.input_schema) {
     const requiredArray = model.input_schema.required;
     for (const propName in model.input_schema.properties) {
+      const isFileField = propName in model.input_filetypes;
       if (requiredArray.includes(propName) || showOptionalParams) {
         const propObj = model.input_schema.properties[propName];
-        buildInputComponent(propName, propObj, requiredArray, components, control, errors);
+        buildInputComponent(propName, propObj, isFileField, requiredArray, components, control, errors);
       }
     }
   }
@@ -216,11 +218,10 @@ function DemoInput({ model, doQuery, setDoQuery }: { model: model; doQuery: bool
     },
   });
 
-
-
-  async function uploadFileAndModifyInput(inputToSend: FieldValues, inputFields:inputSchemaPropsObject) {
+  async function uploadFileAndModifyInput(inputToSend: FieldValues, inputFields:inputSchemaPropsObject, inputFileTypes:fileTypes) {
     for (const prop in inputFields) {
-      if (inputFields[prop as keyof typeof inputFields].allOf) {
+      const isFileField = prop in inputFileTypes;
+      if (isFileField) {
         const uploadedFileUrl = (await modelAPI.uploadFile(inputToSend, prop)).data.serving_url; //TODO: test
         inputToSend[prop as keyof typeof inputFields] = uploadedFileUrl;
       }
@@ -230,9 +231,10 @@ function DemoInput({ model, doQuery, setDoQuery }: { model: model; doQuery: bool
   async function modifyInputAndStartPrediction(data: FieldValues) {
     const inputToSend = { ...data };
     const inputFields = model.input_schema.properties;
+    const inputFileTypes = model.input_filetypes;
     dispatch(setTrace({ trace: "" }));
     dispatch(setModelExample({}));
-    await uploadFileAndModifyInput(inputToSend, inputFields);
+    await uploadFileAndModifyInput(inputToSend, inputFields, inputFileTypes);
     const prediction = await modelAPI.startPrediction(inputToSend)   //TODO: test
     setPredictionId(prediction.data.prediction_id);
   }

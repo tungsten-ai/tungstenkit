@@ -12,7 +12,7 @@ class StoredAvatar:
 
     @property
     def extension(self) -> str:
-        return self.blob.file_path.name.split(".")[-1]
+        return "." + self.blob.file_path.name.split(".")[-1]
 
 
 @attrs.define(kw_only=True)
@@ -30,7 +30,8 @@ class AvatarData(BlobStorable[StoredAvatar]):
         blob_store: BlobStore,
         file_blob_create_policy: FileBlobCreatePolicy = "copy",
     ) -> StoredAvatar:
-        blob = blob_store.add_by_writing((self.bytes_, "avatar" + self.extension))
+        filename = "avatar" + self.extension
+        blob = blob_store.add_by_writing((self.bytes_, "avatar" + filename))
         return StoredAvatar(blob=blob)
 
     @classmethod

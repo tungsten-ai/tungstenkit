@@ -2,16 +2,6 @@ import { AxiosInstance } from "axios";
 import { FieldValues } from "react-hook-form";
 
 function getModelAPI(axiosInstance: AxiosInstance) {
-    function list(projectSlug: string, namespaceSlug: string, queryparams?: string) {
-      const requestQuery = `/projects/${namespaceSlug}/${projectSlug}/models`;
-      return axiosInstance.get(requestQuery, { params: queryparams });
-    }
-  
-    function get(namespaceSlug: string, projectSlug: string, modelVersion: string) {
-      const requestQuery = `projects/${namespaceSlug}/${projectSlug}/models/${modelVersion}`;
-      return axiosInstance.get(requestQuery);
-    }
-
     function getFile(
       filePath: string,
       headers? : Object,
@@ -109,8 +99,6 @@ function getModelAPI(axiosInstance: AxiosInstance) {
   
     return Object.freeze({
       axiosInstance,
-      list,
-      get,
       getFile,
       uploadFile,
       startPrediction,

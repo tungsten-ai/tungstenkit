@@ -8,7 +8,6 @@ import { useState } from "react";
 import TextComponent from "@/components/common/TextComponent";
 import { getClientSideAxios } from "@/axios";
 import { addMarginToComponent } from "@/utils";
-import AddToExamplesBtn from "./AddToExamplesBtn";
 import { AppState } from "@/redux/store";
 import { AxiosInstance } from "axios";
 
@@ -40,9 +39,6 @@ export default function PredictionSuccessOutput() {
         }}
       >
         {outputComponents}
-      </Box>
-      <Box style={{ marginBottom: "100px", height: "200px", width: "400px" }}>
-        {status == "success" && <AddToExamplesBtn/>}
       </Box>
     </Box>
   );

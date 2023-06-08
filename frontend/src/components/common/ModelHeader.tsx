@@ -70,22 +70,11 @@ const createTabs = (model: model) => {
   const demoBtn = (
     <PlayArrowOutlinedIcon sx={{ marginTop: "-3px", fontSize: "20px" }}></PlayArrowOutlinedIcon>
   );
-  const exampleBtn = (
-    <CollectionsBookmarkOutlinedIcon
-      sx={{ marginTop: "-3px", fontSize: "18px" }}
-    ></CollectionsBookmarkOutlinedIcon>
-  );
   const readmeBtn = (
     <MenuBookOutlinedIcon sx={{ marginTop: "-3px", fontSize: "18px" }}></MenuBookOutlinedIcon>
   );
-  const filesBtn = (
-    <FolderCopyOutlinedIcon sx={{ marginTop: "-3px", fontSize: "18px" }}></FolderCopyOutlinedIcon>
-  );
-
-  // , createTab("files", filesBtn)
   const tabs = [createTab("demo", demoBtn)];
   if (model.readme) tabs.push(createTab("readme", readmeBtn));
-  if (model.examples_count>0) tabs.push(createTab("examples", exampleBtn));
   return tabs;
 };
 

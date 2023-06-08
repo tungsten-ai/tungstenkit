@@ -15,13 +15,27 @@ interface model {
       [key: string]: Object|string|number
     };
   };
+  demo_output_schema: {
+    title: string;
+    type: string;
+    required: string[];
+    properties: {
+      [key: string]: Object|string|number
+    };
+  };
+  input_filetypes: fileTypes;
+  output_filetypes: fileTypes;
+  demo_output_filetypes: fileTypes;
   avatar_url: string;
-  examples_count: number;
   readme: string;
 }
 
 interface inputSchemaPropsObject { 
     [key: string]: inputProp
+}
+
+interface fileTypes {
+    [key: string]: string
 }
 
 interface httpResponsePrediction { 
@@ -66,6 +80,7 @@ interface inputProp {
   maximum?:number|null;
   minimum?:number|null;
   type:string|null;
+  format:string|null;
   choices?:Array<string>|Array<number>|null
 }
 

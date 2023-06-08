@@ -3,8 +3,6 @@ import DemoOutput from "@/components/demo/output";
 import ModelHeader from "@/components/common/ModelHeader";
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
-// import FilesView from "@/components/files/filesMainView";
-import Examples from "@/components/examples";
 import Readme from "@/components/readme/";
 import { getClientSideAxios } from "@/axios";
 
@@ -22,10 +20,8 @@ function ModelScreen() {
         <DemoOutput doQuery={doQuery} setDoQuery={setDoQuery} />
       </Box>
     </Box>,
-    // <FilesView model={model}/>, 
   ]
   if (model.readme) modelBodyViews.push(<Readme readme={model.readme} key={1}/>);
-  if (model.examples_count>0) modelBodyViews.push(<Examples model={model} setAppbarIndex = {setAppbarIndex} key={1}/>);
 
   useEffect(() => {
     const fetchModel = async () => {

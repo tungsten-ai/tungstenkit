@@ -64,10 +64,10 @@ class BaseModelServerSettings(pydantic.BaseSettings):
     TUNGSTEN_MODEL_MODULE: str
     TUNGSTEN_MODEL_CLASS: str
 
-    SETUP_TIMEOUT: float = 600.0
-    PREDICTION_TIMEOUT: float = 600.0
+    SETUP_TIMEOUT: float = 3600.0
+    PREDICTION_TIMEOUT: float = 7200.0
 
-    RESULT_EXPIRATION: float = 600.0
+    RESULT_EXPIRATION: float = 3600.0
 
     @property
     def cache_config(self) -> BaseCacheConfig:
