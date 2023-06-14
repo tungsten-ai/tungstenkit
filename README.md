@@ -4,7 +4,7 @@
 [![Downloads](https://static.pepy.tech/badge/tungstenkit?style=flat-square)](https://pypi.org/project/tungstenkit/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/tungstenkit.svg?color=%2334D058)](https://pypi.org/project/tungstenkit/)
 
-[Features](#features) | [Installation](#prerequisites) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
+[Introduction](#tungstenkit-ml-container-made-simple) | [Installation](#prerequisites) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
 
 Tungstenkit is ML containerization tool with a focus on developer productivity and versatility.
 
