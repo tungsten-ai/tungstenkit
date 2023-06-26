@@ -34,6 +34,13 @@ class ModelCreate(BaseModel):
     gpu_memory: int
 
 
+class ModelCreator(BaseModel):
+    id: int
+    username: str
+    name: str
+    avatar_url: str
+
+
 class Model(BaseModel):
     id: int
     project_id: int
@@ -60,7 +67,7 @@ class Model(BaseModel):
     source_files_count: int
     examples_count: int
 
-    creator: User
+    creator: ModelCreator
     created_at: datetime
 
 
@@ -83,7 +90,7 @@ class ModelPredictionExample(BaseModel):
     output: dict
     demo_output: dict
 
-    creator: User
+    creator: ModelCreator
     created_at: datetime
 
 
