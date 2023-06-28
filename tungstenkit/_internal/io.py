@@ -53,7 +53,7 @@ class URIForFile(str):
             return URIForFile(Path(path).as_uri())
 
         if scheme == "http" or scheme == "https":
-            download_file(url=self, out_path=".")
+            return URIForFile(download_file(url=self, out_path=".").as_uri())
 
         return self
 
