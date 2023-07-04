@@ -215,7 +215,7 @@ def _validate_and_serialize_demo_outputs(
             elif isinstance(o, demo_output_cls):
                 validated_demo_outputs.append(jsonable_encoder(run_validation(o)))
             elif isinstance(o, dict):
-                validated_demo_outputs.append(jsonable_encoder(demo_output_cls.parse_obj(o)))
+                validated_demo_outputs.append(jsonable_encoder(demo_output_cls(**o)))
             else:
                 raise exceptions.InvalidDemoOutput(
                     f"Invalid demo output type: {type(o)}. "
@@ -236,7 +236,7 @@ def _validate_and_serialize_outputs(
             if isinstance(o, output_cls):
                 validated_outputs.append(jsonable_encoder(run_validation(o)))
             elif isinstance(o, dict):
-                validated_outputs.append(jsonable_encoder(output_cls.parse_obj(o)))
+                validated_outputs.append(jsonable_encoder(output_cls(**o)))
             else:
                 raise exceptions.InvalidOutput(
                     f"Invalid output type: {type(o)}. Allowed types: 'dict' and "
