@@ -181,6 +181,10 @@ class File(BaseModel):
         field_schema["type"] = "string"
         field_schema["format"] = "uri"
 
+        default = field.default if field else None
+        if isinstance(default, File):
+            field_schema["default"] = default.__root__
+
     @classmethod
     def _get_typeenum(cls) -> FileType:
         return FileType(camel_to_snake(cls.__name__))

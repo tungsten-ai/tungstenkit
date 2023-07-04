@@ -109,8 +109,8 @@ class TungstenClient:
                 output_filetypes=model.io.output_filetypes,
                 demo_output_filetypes=model.io.demo_output_filetypes,
                 gpu_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu and model.gpu_mem_gb else 0,
-                source_files=source_files,
-                skipped_source_files=skipped_source_files,
+                # source_files=source_files,
+                # skipped_source_files=skipped_source_files,
             )
 
             model_in_server = self.api.create_model(project=project, req=req)
