@@ -16,8 +16,8 @@ class RequirementsTxt:
 
     def add_requirement(self, requirement: PipRequirement):
         self._pkg_requirements.append(requirement.to_str(index=False))
-        if requirement.pip_extra_index_url:
-            self._extra_index_urls.add(requirement.pip_extra_index_url)
+        if requirement.extra_index_url:
+            self._extra_index_urls.add(requirement.extra_index_url)
 
     def build(self):
         requirements_txt = ""

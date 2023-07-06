@@ -34,8 +34,6 @@ TORCH_WHEEL_REGEX = (
 @attrs.define
 class TorchCollection(GPUPackageCollection):
     # TODO filter by available cuda images
-    requires_system_cuda = False
-
     torch: t.List[GPUPackageRelease]
     torchvision: t.List[GPUPackageRelease]
     torchaudio: t.List[GPUPackageRelease]
@@ -173,6 +171,14 @@ class TorchCollection(GPUPackageCollection):
             if pkg_name in pkg_names
         ]
 
+    def get_err_msg_for_constraint(self, pkg_spec: GPUPackageConstraint):
+        # TODO
+        return ""
+
     @classmethod
     def get_pkg_names(cls):
         return list(attrs.fields_dict(cls).keys())
+
+    @classmethod
+    def requires_system_cuda(cls):
+        return False

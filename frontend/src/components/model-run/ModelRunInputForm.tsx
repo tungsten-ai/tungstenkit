@@ -64,23 +64,19 @@ export function ModelRunInputForm({
     setThrottling(false);
   });
 
-  const uploadFile = async (file: File | string) => {
-    let url: string | null;
+  const uploadFile = async (file: File | string | null) => {
+    let url: string | null | undefined;
 
     if (file instanceof File) {
       // Upload file
       url = await fileAPI
         .upload(file)
         .then((resp) => resp.data.serving_url)
-        .catch((error) => {
-          url = null;
-          if (isAxiosError(error) && error.response && error.response.status === 401) {
-            router.push(buildSignInPath());
-          }
-          return url;
+        .catch(() => {
+          return "";
         });
     } else {
-      // Pass if file is already url
+      // Pass if file is already url or null
       url = file;
     }
 
@@ -93,11 +89,11 @@ export function ModelRunInputForm({
     const inputFieldNames = Object.keys(model.input_schema.properties);
 
     const fileFieldKeys = inputFieldNames.filter((n) => !!model.input_filetypes[n]);
-    const promises = fileFieldKeys.map((n) => uploadFile(formData[n] as File | string));
+    const promises = fileFieldKeys.map((n) => uploadFile(formData[n] as File | string | null));
     const fileFieldValues = await Promise.all(promises);
 
     // On error, return without mutation.
-    if (fileFieldValues.some((value) => value == null)) {
+    if (fileFieldValues.some((value) => value === "")) {
       onError();
       setSubmitting(false);
       return;

@@ -16,6 +16,9 @@ from ..gpu_pkg_collections import supported_gpu_pkg_names
 from ..pkg_manager import PythonPackageManager, RequirementsTxt
 from .template_args import TemplateArgs
 
+# LARGE_FILE_THRESHOLD = 100 * 1024**2
+LARGE_FILE_THRESHOLD = 10 * 1024
+
 
 class BaseDockerfile(metaclass=abc.ABCMeta):
     def __init__(
@@ -113,7 +116,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
         extra_pkg_requirements = py_pkg_manager.list_extra_pkg_pip_requirements()
         for r in extra_pkg_requirements:
-            if r.pip_index_url:
+            if r.index_url:
                 list_pip_install_args.append(r.to_str().split(" "))
             else:
                 requirements_txt.add_requirement(r)
@@ -126,11 +129,10 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
         # Set base image
         if self.config.base_image:
             image: BaseImage = CustomImage(self.config.base_image)
-        elif not isinstance(cuda_ver, NotRequired):
+        elif not isinstance(cuda_ver, NotRequired) and py_pkg_manager.requires_system_cuda():
             log_info("Fetching the list of cuda base images")
             cuda_image_collection = CUDAImageCollection.from_docker_hub()
-            # Infered successfully but got None -> any version is ok
-            if cuda_ver is None or not py_pkg_manager.requires_system_cuda:
+            if cuda_ver is None:  # Requires CUDA but any version is okay
                 image = cuda_image_collection.get_latest_image()
             else:
                 image = cuda_image_collection.get_cuda_image_by_cuda_cudnn_ver(cuda_ver, cudnn_ver)
@@ -191,8 +193,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
                 else:
                     size = path.stat(follow_symlinks=False).st_size
-                    # if size > 100 * 1024**2:
-                    if size > 10 * 1024:
+                    if size > LARGE_FILE_THRESHOLD:
                         large_files.append(path)
                     else:
                         small_files.append(path)

@@ -68,9 +68,10 @@ class SavedPrediction:
 
         input = self.input.copy()
         for field_name in input_filetypes:
-            input[field_name] = convert_file_url_to_http(
-                input[field_name], allow_unknown_file_url=False
-            )
+            if input[field_name] is not None:
+                input[field_name] = convert_file_url_to_http(
+                    input[field_name], allow_unknown_file_url=False
+                )
         output = (
             None
             if self.output is None
@@ -120,9 +121,12 @@ class PredictionService:
 
         try:
             for field_name in self.input_filetypes:
-                fileurl, filename = self._convert_file_serving_url_to_file_url(input[field_name])
-                input[field_name] = fileurl
-                input_filenames.add(filename)
+                if field_name in input.keys() and input[field_name] is not None:
+                    fileurl, filename = self._convert_file_serving_url_to_file_url(
+                        input[field_name]
+                    )
+                    input[field_name] = fileurl
+                    input_filenames.add(filename)
             try:
                 prediction_id, file_paths = self.model_client.create_demo(inputs=[input])
             except ModelClientError as e:
@@ -306,9 +310,16 @@ def _raise_not_found(prediction_id: str):
 
 def _fill_omitted_input_fields_as_defaults(input: t.Dict, input_schema: t.Dict):
     if "required" not in input_schema:
-        return
+        required_field_names = []
+    else:
+        required_field_names = input_schema["required"]
 
-    existing_field_names_in_input = list(input.keys())
+    required_field_names = list(filter(lambda key: key in required_field_names, input.keys()))
     for field_name, field_property in input_schema["properties"].items():
-        if field_name not in existing_field_names_in_input and "default" in field_property:
-            input[field_name] = field_property["default"]
+        if field_name not in input:
+            if "default" in field_property:
+                input[field_name] = field_property["default"]
+            elif field_name not in required_field_names:
+                input[field_name] = None
+            else:
+                HTTPException(status_code=422, detail=f"Field {field_name} is required.")

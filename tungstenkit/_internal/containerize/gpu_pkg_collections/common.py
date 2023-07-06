@@ -1,6 +1,7 @@
 import typing as t
 
 import attrs
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from tungstenkit._internal.utils.version import MIN_VER, order_optional_version
@@ -25,7 +26,7 @@ class GPUPackageRelease:
 @attrs.define
 class GPUPackageConstraint:
     pkg_name: t.Optional[str] = attrs.field(default=None)
-    pkg_ver: t.Optional[Version] = attrs.field(default=None)
+    pkg_spec: t.Optional[SpecifierSet | Version] = attrs.field(default=None)
     no_cuda: t.Optional[bool] = attrs.field(default=None)
     cuda_ver: t.Optional[Version] = attrs.field(default=None)
     any_cuda_in: t.Optional[t.Iterable[Version]] = attrs.field(default=None)

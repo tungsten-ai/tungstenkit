@@ -25,7 +25,9 @@ def order_optional_version(optional_version: t.Optional[Version]):
     return optional_version
 
 
-def check_version_with_constraint(ver: t.Optional[Version], constraint: t.Optional[Version]):
+def check_version_matching_clause_loosely(
+    ver: t.Optional[Version], constraint: t.Optional[Version]
+):
     """
     Check a version satisfies a constraint.
     For example, if constraint is ``1.1``, version ``1.2``, ``1`` is not passed.

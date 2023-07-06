@@ -1,7 +1,9 @@
+import inspect
 import typing as t
 
 from pydantic import create_model as create_pydantic_model
 from pydantic.fields import FieldInfo
+from pydantic.typing import is_none_type, is_union
 
 from tungstenkit._internal import io
 from tungstenkit._internal.utils.string import camel_to_snake
@@ -38,12 +40,28 @@ def validate_input_class(input_cls: t.Type):
     type_hints = t.get_type_hints(input_cls)
     fields = input_cls.__fields__
     for name, type_ in type_hints.items():
+        field = fields[name]
         origin = get_type_origin(type_)
+        type_args = get_type_args(type_)
         valid = False
-        for supported_input_type in SUPPORTED_INPUT_TYPES:
-            if issubclass(origin, supported_input_type):
-                valid = True
-                break
+
+        if (
+            not field.required
+            and is_union(origin)
+            and sum(is_none_type(arg) for arg in type_args) == 1
+            and len(type_args) == 2
+        ):
+            type_idx = [is_none_type(arg) for arg in type_args].index(False)
+
+            valid = inspect.isclass(type_args[type_idx]) and any(
+                issubclass(type_args[type_idx], supported_input_type)
+                for supported_input_type in SUPPORTED_INPUT_TYPES
+            )
+        elif inspect.isclass(origin):
+            valid = any(
+                issubclass(origin, supported_input_type)
+                for supported_input_type in SUPPORTED_INPUT_TYPES
+            )
 
         if not valid:
             invalid_types[input_cls.__name__ + "." + name] = type_
@@ -65,6 +83,7 @@ def validate_input_class(input_cls: t.Type):
     # Set the default description on input fields if not set
     updated_fields: t.Dict[str, t.Tuple[t.Type, FieldInfo]] = dict()
     for name, type_ in type_hints.items():
+        field = fields[name]
         field_info = fields[name].field_info
         if not field_info.description:
             field_info.description = _build_default_description(field_name=name)
@@ -81,7 +100,7 @@ def validate_input_class(input_cls: t.Type):
 
 
 def validate_output_class(output_cls: t.Type):
-    if not issubclass(output_cls, io.BaseIO):
+    if not inspect.isclass(output_cls) or not issubclass(output_cls, io.BaseIO):
         raise TypeError(f"Output type '{output_cls}' is not a subclass of '{io.BaseIO}'")
 
     invalid_types_and_reasons: t.Dict[str, t.Tuple[t.Type, str]] = dict()
@@ -91,8 +110,14 @@ def validate_output_class(output_cls: t.Type):
 
     def validate_type(type_: t.Type, field_name: str):
         nonlocal unsupported_field, unsupported_dict_key
+
         origin = get_type_origin(type_)
         type_args = get_type_args(type_)
+
+        if not inspect.isclass(origin):
+            unsupported_field = True
+            invalid_types_and_reasons[field_name] = (type_, "unsupported output type")
+            return
 
         for supported_output_type in SUPPORTED_OUTPUT_TERMINAL_TYPES:
             if issubclass(origin, supported_output_type):
@@ -126,8 +151,11 @@ def validate_output_class(output_cls: t.Type):
                 validate_type(type_args[1], field_name + ".<'value'>")
 
         elif issubclass(origin, io.BaseIO):
-            for name, type_ in t.get_type_hints(origin).items():
-                validate_type(type_, field_name + "." + name)
+            if any(not field.required for field in origin.__fields__.values()):
+                invalid_types_and_reasons[field_name] = (type_, "output cannot have an option")
+            else:
+                for name, type_ in t.get_type_hints(origin).items():
+                    validate_type(type_, field_name + "." + name)
 
         else:
             unsupported_field = True
@@ -179,6 +207,19 @@ def get_filetypes(io_cls: t.Type[io.BaseIO]) -> t.Dict[str, io.FileType]:
     def _get_filetypes(type_: type, json_index: str):
         origin = get_type_origin(type_)
         type_args = get_type_args(type_)
+
+        if is_union(origin):
+            is_type_arg_none = [is_none_type(arg) for arg in type_args]
+            if sum(is_type_arg_none) != 1 or len(type_args) != 2:
+                return
+
+            type_idx = is_type_arg_none.index(False)
+            type_ = type_args[type_idx]
+            origin = get_type_origin(type_)
+            type_args = get_type_args(type_)
+
+        if not inspect.isclass(origin):
+            return
 
         if issubclass(origin, io.File):
             ret[json_index] = origin._get_typeenum()

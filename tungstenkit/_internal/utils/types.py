@@ -1,16 +1,15 @@
 import typing
 
 from packaging.version import Version
+from pydantic.typing import get_args
 
 from tungstenkit._versions import py_version
 
 
 def get_type_args(t):
-    if py_version >= Version("3.8"):
-        return typing.get_args(t)
     try:
-        return t.__args__
-    except AttributeError:
+        return get_args(t)
+    except (AttributeError, TypeError):
         return tuple()
 
 
@@ -19,6 +18,7 @@ def get_type_origin(t):
         origin = typing.get_origin(t)
         if origin is None:
             return t
+        return origin
     try:
         if py_version >= Version("3.7"):
             return t.__origin__

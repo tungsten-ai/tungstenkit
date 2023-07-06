@@ -15,7 +15,6 @@ TF_METADATA_URL = "https://www.tensorflow.org/install/source"
 
 @attrs.define
 class TFCollection(GPUPackageCollection):
-    requires_system_cuda = True
     releases: t.List[GPUPackageRelease]
 
     @classmethod
@@ -123,3 +122,7 @@ class TFCollection(GPUPackageCollection):
     def get_err_msg_for_constraint(self, pkg_spec: GPUPackageConstraint):
         # TODO
         return ""
+
+    @classmethod
+    def requires_system_cuda(cls):
+        return True

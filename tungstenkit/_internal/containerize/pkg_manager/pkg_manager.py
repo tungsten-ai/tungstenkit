@@ -2,6 +2,8 @@ import sys
 import typing as t
 
 import attrs
+from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from tungstenkit import exceptions
@@ -48,26 +50,35 @@ class PythonPackageManager:
     _update_history: t.List[UpdateHistory] = attrs.field(factory=list, init=False)
     _extra_pkgs: t.List[PipRequirement] = attrs.field(factory=list, init=False)
 
-    @property
-    def requires_system_cuda(self):
-        return any(col.requires_system_cuda for col in self._gpu_pkg_collections.values())
+    def requires_system_cuda(self) -> bool:
+        return any(col.requires_system_cuda() for col in self._gpu_pkg_collections.values())
 
     def add_requirement_str(self, requirement_str: str):
         # Parse requirement string
         # TODO support --extra-index-url and --index-url
-        pkg_ver: t.Optional[Version]
-        if "==" in requirement_str:
-            pkg_name, pkg_ver_str = requirement_str.split("==")
-            pkg_ver = Version(pkg_ver_str)
-            if not isinstance(pkg_ver, Version):
-                raise exceptions.PipPackageParseError(f'"{pkg_ver_str}" in python_packages')
+
+        try:
+            parsed = Requirement(requirement_str)
+        except IndexError:
+            raise exceptions.PipPackageParseError(
+                f"No package name in requirement string: {requirement_str}"
+            )
+        except Exception as e:
+            raise exceptions.PipPackageParseError(str(e))
+
+        pkg_name = parsed.name
+        specifier_set = parsed.specifier
+        specifier_list = list(specifier_set)
+
+        if len(specifier_set) == 1 and specifier_list[0].operator == "==":
+            spec: Version | SpecifierSet = Version(specifier_list[0].version)
         else:
-            pkg_name, pkg_ver = requirement_str, None
+            spec = specifier_set
 
         # Check if a GPU package
         collection_name = get_gpu_pkg_collection_name_by_pkg_name(pkg_name)
         if collection_name is None:
-            self._extra_pkgs.append(PipRequirement(name=pkg_name, version=pkg_ver))
+            self._extra_pkgs.append(PipRequirement(name=pkg_name, spec=spec))
             return
 
         # Lazy initialization of a GPU package collection
@@ -78,8 +89,8 @@ class PythonPackageManager:
             self._required_gpu_pkg_names[collection_name] = set()
 
         self._required_gpu_pkg_names[collection_name].add(pkg_name)
-        if pkg_ver:
-            self._set_gpu_pkg_constraint(GPUPackageConstraint(pkg_name=pkg_name, pkg_ver=pkg_ver))
+        if spec and (isinstance(spec, Version) or len(spec) > 0):
+            self._set_gpu_pkg_constraint(GPUPackageConstraint(pkg_name=pkg_name, pkg_spec=spec))
 
     def set_gpu(self, gpu: bool):
         self._set_gpu_pkg_constraint(GPUPackageConstraint(no_cuda=not gpu))
@@ -174,9 +185,9 @@ class PythonPackageManager:
                 [
                     PipRequirement(
                         name=gpu_pkg.pkg_name,
-                        version=gpu_pkg.pkg_ver,
-                        pip_index_url=gpu_pkg.pip_index_url,
-                        pip_extra_index_url=gpu_pkg.pip_extra_index_url,
+                        spec=gpu_pkg.pkg_ver,
+                        index_url=gpu_pkg.pip_index_url,
+                        extra_index_url=gpu_pkg.pip_extra_index_url,
                     )
                     for gpu_pkg in gpu_pkgs_in_collection
                 ]

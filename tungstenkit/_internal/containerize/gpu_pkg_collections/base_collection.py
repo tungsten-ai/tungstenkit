@@ -1,20 +1,19 @@
 import abc
 import typing as t
 
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from tungstenkit._internal.utils.string import removesuffix
 from tungstenkit._internal.utils.version import (
     check_if_two_versions_compatible,
-    check_version_with_constraint,
+    check_version_matching_clause_loosely,
 )
 
 from .common import GPUPackageConstraint, GPUPackageRelease
 
 
 class GPUPackageCollection(abc.ABC):
-    requires_system_cuda: bool
-
     @classmethod
     def init(cls):
         # TODO call from_file or from_remote periodically
@@ -22,29 +21,42 @@ class GPUPackageCollection(abc.ABC):
         return cls.from_remote()
 
     @classmethod
+    @abc.abstractmethod
     def from_remote(cls):
         raise NotImplementedError
 
     @property
+    @abc.abstractmethod
     def has_no_compatible_vers(self) -> bool:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def get_available_cuda_vers(self, pkg_names: t.List[str]) -> t.Set[t.Optional[Version]]:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def get_available_cudnn_vers(self, pkg_names: t.List[str]) -> t.Set[t.Optional[Version]]:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def get_available_py_vers(self, pkg_names: t.List[str]) -> t.Set[Version]:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def add_constraint(self, constraint: GPUPackageConstraint) -> None:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def get_latest_releases(self, pkg_names: t.Iterable[str]) -> t.List[GPUPackageRelease]:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def get_err_msg_for_constraint(self, constraint: GPUPackageConstraint) -> t.Optional[str]:
+        raise NotImplementedError
+
+    @classmethod
+    @abc.abstractmethod
+    def requires_system_cuda(cls):
         raise NotImplementedError
 
     @classmethod
@@ -60,10 +72,14 @@ class GPUPackageCollection(abc.ABC):
         releases: t.List[GPUPackageRelease], constraint: GPUPackageConstraint
     ) -> t.List[GPUPackageRelease]:
         filter_fns: t.List[t.Callable[[GPUPackageRelease], bool]] = list()
-        if constraint.pkg_ver is not None:
+        if isinstance(constraint.pkg_spec, SpecifierSet):
+            pkg_specifier_set = constraint.pkg_spec
+            filter_fns.append(lambda release: release.pkg_ver in pkg_specifier_set)
+        if isinstance(constraint.pkg_spec, Version):
+            pkg_version_spec = constraint.pkg_spec
             filter_fns.append(
-                lambda release: check_version_with_constraint(
-                    ver=release.pkg_ver, constraint=constraint.pkg_ver
+                lambda release: check_version_matching_clause_loosely(
+                    release.pkg_ver, pkg_version_spec
                 )
             )
         if constraint.no_cuda is not None:
@@ -103,6 +119,8 @@ class GPUPackageCollection(abc.ABC):
         filtered: t.Union[filter, t.List] = releases
         for filter_fn in filter_fns:
             filtered = filter(filter_fn, filtered)
+
         if len(filter_fns) > 0:
-            releases = list(filtered)
-        return releases
+            filtered_list = list(filtered)
+
+        return filtered_list
