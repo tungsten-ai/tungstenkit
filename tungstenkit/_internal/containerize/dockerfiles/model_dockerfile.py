@@ -12,7 +12,7 @@ class ModelDockerfile(BaseDockerfile):
 
     def build_template_args(self, *args, **kwargs):
         template_args = super().build_template_args(*args, **kwargs)
-        template_args.env_vars["TUNGSTEN_MAX_BATCH_SIZE"] = self.config.batch_size
+        template_args.tungsten_env_vars["TUNGSTEN_MAX_BATCH_SIZE"] = self.config.batch_size
         return template_args
 
     @classmethod

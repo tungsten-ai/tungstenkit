@@ -42,7 +42,7 @@ def _default_include_files():
 
 
 def _default_exclude_files():
-    return [".*/", "__pycache__/", "*.pyc", "*.pyo", "*.pyd"]
+    return [".*/", "__pycache__", "*.pyc", "*.pyo", "*.pyd"]
 
 
 # TODO print warnings if there are ignored fields
@@ -58,6 +58,7 @@ class BuildConfig(BaseModel):
     exclude_files: t.List[str] = Field(default_factory=_default_exclude_files)
     pip_wheels: t.List[Path] = Field(default_factory=list)
     environment_variables: t.Dict[str, str] = Field(default_factory=dict)
+    tungsten_environment_variables: t.Dict[str, str] = Field(default_factory=dict)
 
     system_packages: t.List[str] = Field(default_factory=list)
     dockerfile_commands: t.List[str] = Field(default_factory=list)

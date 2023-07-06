@@ -5,6 +5,7 @@ from pathlib import Path
 import attrs
 import jinja2
 from packaging.version import Version
+from pathspec import PathSpec
 
 from tungstenkit._internal.configs import BuildConfig
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
@@ -52,7 +53,11 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
         return dockerfile
 
-    def build_template_args(self, tmp_dir_in_build_ctx: Path, tungstenkit_dir_in_build_ctx: Path):
+    def build_template_args(
+        self,
+        tmp_dir_in_build_ctx: Path,
+        tungstenkit_dir_in_build_ctx: Path,
+    ):
         # TODO perfer cuda version available in docker hub
         # TODO check py vers compatible with miniforge3
         # TODO don't use cuda base image if python package already includes cuda (e.g. torch)
@@ -125,7 +130,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             log_info("Fetching the list of cuda base images")
             cuda_image_collection = CUDAImageCollection.from_docker_hub()
             # Infered successfully but got None -> any version is ok
-            if cuda_ver is None:
+            if cuda_ver is None or not py_pkg_manager.requires_system_cuda:
                 image = cuda_image_collection.get_latest_image()
             else:
                 image = cuda_image_collection.get_cuda_image_by_cuda_cudnn_ver(cuda_ver, cudnn_ver)
@@ -133,6 +138,10 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             log_info("Fetching the list of python base images")
             python_image_collection = PythonImageCollection.from_docker_hub()
             image = python_image_collection.get_py_image_by_ver(py_ver)
+
+        large_files, small_files = self.split_large_and_small_files(
+            Path("."), tmp_dir_in_build_ctx
+        )
 
         template_args = TemplateArgs(
             image=image,
@@ -143,12 +152,57 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             system_packages=self.config.system_packages,
             pip_wheels_in_build_ctx=self.config.pip_wheels,
             env_vars=self.config.environment_variables,
+            tungsten_env_vars=self.config.tungsten_environment_variables,
             copy_files=self.config.copy_files,
             device="gpu" if self.config.gpu else "cpu",
             tungstenkit_dir_in_build_ctx=tungstenkit_dir_in_build_ctx,
+            large_files=large_files,
+            small_files=small_files,
         )
 
         return template_args
+
+    def split_large_and_small_files(
+        self,
+        curr_dir: Path,
+        tmp_dir_in_build_ctx: Path,
+    ) -> t.Tuple[t.List[Path], t.List[Path]]:
+        """
+        Returns large file paths and small file paths as lists.
+        If there is no large files, returns ``None``.
+        """
+        include_spec = PathSpec.from_lines("gitwildmatch", self.config.include_files)
+        exclude_spec = PathSpec.from_lines(
+            "gitwildmatch", self.config.exclude_files + [tmp_dir_in_build_ctx.as_posix()]
+        )
+
+        def split(curr_dir: Path):
+            large_files, small_files = [], []
+            for path in curr_dir.iterdir():
+                if not include_spec.match_file(path.as_posix()) or exclude_spec.match_file(
+                    path.as_posix()
+                ):
+                    continue
+
+                if path.is_dir():
+                    ret = split(path)
+                    large_files.extend(ret[0])
+                    small_files.extend(ret[1])
+
+                else:
+                    size = path.stat(follow_symlinks=False).st_size
+                    # if size > 100 * 1024**2:
+                    if size > 10 * 1024:
+                        large_files.append(path)
+                    else:
+                        small_files.append(path)
+
+            if len(large_files) == 0:
+                return [], [curr_dir]
+
+            return large_files, small_files
+
+        return split(curr_dir)
 
     @classmethod
     @abc.abstractmethod

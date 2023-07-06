@@ -34,6 +34,8 @@ TORCH_WHEEL_REGEX = (
 @attrs.define
 class TorchCollection(GPUPackageCollection):
     # TODO filter by available cuda images
+    requires_system_cuda = False
+
     torch: t.List[GPUPackageRelease]
     torchvision: t.List[GPUPackageRelease]
     torchaudio: t.List[GPUPackageRelease]
@@ -174,7 +176,3 @@ class TorchCollection(GPUPackageCollection):
     @classmethod
     def get_pkg_names(cls):
         return list(attrs.fields_dict(cls).keys())
-
-    @classmethod
-    def requires_system_cuda(cls) -> bool:
-        return True

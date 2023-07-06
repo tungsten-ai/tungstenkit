@@ -67,10 +67,6 @@ class PostPredictionRequest(BaseModel):
     __root__: t.Dict
 
 
-class PostPredictionResponse(BaseModel):
-    prediction_id: str
-
-
 class Prediction(BaseModel):
     id: str
     status: PredictionStatus

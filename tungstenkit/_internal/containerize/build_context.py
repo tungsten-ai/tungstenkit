@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 import typing as t
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -10,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 import attrs
+from filelock import FileLock
 from pathspec import PathSpec
 from rich.progress import Progress, TextColumn
 
@@ -28,7 +28,7 @@ from tungstenkit._internal.utils.file import (
 
 from .dockerfiles import BaseDockerfile
 
-TMP_DIR_PREFIX = ".tungsten-build-"
+TMP_DIR_NAME = ".tungsten-build"
 
 
 @attrs.define
@@ -39,12 +39,12 @@ class BuildContext:
 
     def walk_fs(self) -> t.Generator[storables.SourceFile, None, None]:
         """
-        Yield files under ``TUNGSTEN_DIR_IN_CONTAINER`` in container fs
+        Recursively yield files under ``TUNGSTEN_DIR_IN_CONTAINER`` in container fs
         """
         abs_root_dir = self.root_dir.resolve()
         include_spec = PathSpec.from_lines("gitwildmatch", self.config.include_files)
         exclude_spec = PathSpec.from_lines(
-            "gitwildmatch", self.config.exclude_files + [TMP_DIR_PREFIX + "*/"]
+            "gitwildmatch", self.config.exclude_files + [TMP_DIR_NAME + "*/"]
         )
 
         for rel_path_str in include_spec.match_tree(self.root_dir, follow_links=False):
@@ -89,16 +89,14 @@ class BuildContext:
     def build(self, tags: t.List[str]) -> None:
         subprocess_args = [
             "docker",
-            "buildx",
             "build",
-            "--load",
             "--file=" + str(self.dockerfile_path.relative_to(self.root_dir)),
         ]
         for tag in tags:
             subprocess_args.append(f"--tag={tag}")
         subprocess_args.append(str(self.root_dir))
         log_debug(msg="$ " + " ".join(subprocess_args), pretty=False)
-        res = subprocess.run(subprocess_args, check=False)
+        res = subprocess.run(subprocess_args, check=False, env={"DOCKER_BUILDKIT": "1"})
 
         if res.returncode != 0:
             with hide_traceback():
@@ -130,92 +128,74 @@ def setup_build_ctx(
         f"\n exclude_files: {build_config.exclude_files}\n"
     )
     build_config.include_files.append(("/" / rel_path_to_module).as_posix())
-    with tempfile.TemporaryDirectory(prefix=".tungsten-build-", dir=build_dir) as tmp_dir_str:
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            rel_path_to_tmp_dir = Path(tmp_dir_str).resolve().relative_to(build_dir)
-            rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
-            rel_path_to_dockerignore = rel_path_to_tmp_dir / "Dockerfile.dockerignore"
-            rel_path_to_tungstenkit = rel_path_to_tmp_dir / "tungstenkit"
-            rel_path_to_tungstenkit.mkdir()
-            future_list: t.List[Future] = []
 
-            dockerignore = _generate_dockerignore(
-                build_dir=build_dir,
-                include_patterns=build_config.include_files,
-                exclude_patterns=build_config.exclude_files,
+    # Prepare tmp dir
+    rel_path_to_tmp_dir = Path(TMP_DIR_NAME)
+    try:
+        lock_path = rel_path_to_tmp_dir / ".tungsten-build.lock"
+        if lock_path.exists() and FileLock(lock_path).is_locked:
+            raise exceptions.BuildError(
+                "A build is already in progress. Restart after the build in progress is complete."
             )
-            dockerignore_path = build_dir / rel_path_to_dockerignore
-            dockerignore_path.write_text(dockerignore)
-            _copy_tungstenkit(
-                build_dir=build_dir,
-                rel_path_to_tungstenkit=rel_path_to_tungstenkit,
-                executor=executor,
-                future_list=future_list,
-            )
-            build_config.copy_files.extend(
-                _convert_abs_symlinks_to_rel(
-                    build_dir,
-                    include_patterns=build_config.include_files,
-                    exclude_patterns=build_config.exclude_files,
-                    rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                )
-            )
-            if build_config.copy_files:
-                build_config.copy_files = _copy_files(
-                    abs_path_to_build_dir=build_dir,
-                    rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                    include_with_dest=build_config.copy_files,
+        if rel_path_to_tmp_dir.exists():
+            shutil.rmtree(rel_path_to_tmp_dir)
+
+        rel_path_to_tmp_dir.mkdir()
+
+        with FileLock(lock_path):
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
+                rel_path_to_tungstenkit = rel_path_to_tmp_dir / "tungstenkit"
+                rel_path_to_tungstenkit.mkdir()
+                future_list: t.List[Future] = []
+
+                _copy_tungstenkit(
+                    build_dir=build_dir,
+                    rel_path_to_tungstenkit=rel_path_to_tungstenkit,
                     executor=executor,
                     future_list=future_list,
                 )
-                _show_progress_while_copying_files(
-                    copy_dir=rel_path_to_tmp_dir,
-                    future_list=future_list,
-                    ignore_patterns=["tungstenkit"],
+                build_config.copy_files.extend(
+                    _convert_abs_symlinks_to_rel(
+                        build_dir,
+                        include_patterns=build_config.include_files,
+                        exclude_patterns=build_config.exclude_files,
+                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
+                    )
+                )
+                if build_config.copy_files:
+                    build_config.copy_files = _copy_files(
+                        abs_path_to_build_dir=build_dir,
+                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
+                        include_with_dest=build_config.copy_files,
+                        executor=executor,
+                        future_list=future_list,
+                    )
+                    _show_progress_while_copying_files(
+                        copy_dir=rel_path_to_tmp_dir,
+                        future_list=future_list,
+                        ignore_patterns=["tungstenkit"],
+                    )
+
+                dockerfile = dockerfile_generator.generate(
+                    tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
+                    tungstenkit_dir_in_build_ctx=rel_path_to_tungstenkit,
+                )
+                dockerfile_path = build_dir / rel_path_to_dockerfile
+                dockerfile_path.write_text(dockerfile)
+                log_debug(
+                    "Dockerfile:\n"
+                    + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
+                    pretty=False,
                 )
 
-            dockerfile = dockerfile_generator.generate(
-                tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
-                tungstenkit_dir_in_build_ctx=rel_path_to_tungstenkit,
-            )
-            dockerfile_path = build_dir / rel_path_to_dockerfile
-            dockerfile_path.write_text(dockerfile)
-            log_debug(
-                "Dockerfile:\n"
-                + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
-                pretty=False,
-            )
-            log_debug(
-                ".dockerignore:\n"
-                + "\n".join(["  " + line for line in dockerignore.strip().split("\n") if line]),
-                pretty=False,
-            )
-
-            yield BuildContext(
-                config=build_config, root_dir=build_dir, dockerfile_path=dockerfile_path
-            )
-
-
-def _generate_dockerignore(
-    build_dir: Path,
-    include_patterns: t.List[str],
-    exclude_patterns: t.List[str],
-) -> str:
-    if len(include_patterns) == 0:
-        return ""
-
-    # Copy files matched against include_files and not against exclude_files
-    dockerignore_lines = []
-
-    base_spec = PathSpec.from_lines("gitwildmatch", ["*"])
-    include_spec = PathSpec.from_lines("gitwildmatch", include_patterns)
-    exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_patterns)
-    for _rel_path_str in base_spec.match_tree(build_dir, follow_links=False):
-        rel_path_str = Path(_rel_path_str).as_posix()
-        if not include_spec.match_file(rel_path_str) or exclude_spec.match_file(rel_path_str):
-            dockerignore_lines.append(rel_path_str)
-
-    return "\n".join(dockerignore_lines) + "\n"
+                yield BuildContext(
+                    config=build_config,
+                    root_dir=build_dir,
+                    dockerfile_path=dockerfile_path,
+                )
+    finally:
+        shutil.rmtree(rel_path_to_tmp_dir)
 
 
 def _convert_abs_symlinks_to_rel(
@@ -226,7 +206,9 @@ def _convert_abs_symlinks_to_rel(
 ) -> t.List[t.Tuple[str, str]]:
     link_and_target_pairs: t.List[t.Tuple[str, str]] = []
     include_spec = PathSpec.from_lines("gitwildmatch", include_patterns)
-    exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_patterns)
+    exclude_spec = PathSpec.from_lines(
+        "gitwildmatch", exclude_patterns + [rel_path_to_tmp_dir.as_posix()]
+    )
     for link_path in list(abs_path_to_build_dir.rglob("*")):
         if not link_path.is_symlink():
             continue

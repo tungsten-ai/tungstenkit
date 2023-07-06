@@ -4,10 +4,32 @@
 ENV{% for key, val in env_vars.items() %} {{ key }}={{ val }}{% endfor %}
 {% endif %}
 
-{% if system_packages|length > 0 %}
-RUN {{ cache.mount_apt_cache() }} apt-get install -y --no-install-recommends{% for pkg in system_packages %} {{ pkg }}{% endfor %} 
-RUN apt-get clean > /dev/null && rm -rf /var/lib/apt/lists/*
+{% if list_pip_install_args|length > 0 %}
+{% for args in list_pip_install_args %}
+RUN {{ cache.mount_pip_cache() }} pip install {{ " ".join(args) }}
+{% endfor %}
 {% endif %}
+
+{% for path in large_files %}
+COPY --link {{ path.as_posix() }} {{ path.as_posix() }}
+{% endfor %}
+
+{% if pip_wheels_in_build_ctx|length > 0 %}
+RUN mkdir -p /tmp/wheels
+{% for path in pip_wheels_in_build_ctx %}
+COPY {{ path.as_posix() }} /tmp/wheels
+{% endfor %}
+RUN rm -rf /tmp/wheels
+{% endif %}
+
+{% if pip_requirements_txt_in_build_ctx != None %}
+COPY --link {{ pip_requirements_txt_in_build_ctx.as_posix() }} /tmp/requirements.txt
+COPY --link {{ tungstenkit_dir_in_build_ctx.as_posix()}} {{ tungstenkit_dir_in_container.as_posix()}}
+RUN {{ cache.mount_pip_cache() }} echo "." >> /tmp/requirements.txt && \
+    cd {{ tungstenkit_dir_in_container.as_posix()}} && \
+    pip install -r /tmp/requirements.txt && \
+    rm -f /tmp/requirements.txt
+{% endif%}
 
 {% if dockerfile_commands|length > 0 %}
 {% for cmd in dockerfile_commands %}
@@ -15,31 +37,9 @@ RUN apt-get clean > /dev/null && rm -rf /var/lib/apt/lists/*
 {% endfor %}
 {% endif %}
 
-{% if list_pip_install_args|length > 0 %}
-{% for args in list_pip_install_args %}
-RUN {{ cache.mount_pip_cache() }} pip install {{ " ".join(args) }}
+{% for path in small_files %}
+COPY --link {{ path.as_posix() }} {{ path.as_posix() }}
 {% endfor %}
-{% endif %}
-
-{% if pip_requirements_txt_in_build_ctx != None %}
-COPY {{ pip_requirements_txt_in_build_ctx.as_posix() }} /tmp/requirements.txt
-RUN {{ cache.mount_pip_cache() }} pip install -r /tmp/requirements.txt && \
-    rm -f /tmp/requirements.txt
-{% endif%}
-
-{% if pip_wheels_in_build_ctx|length > 0 %}
-RUN mkdir -p /tmp/wheels
-{% for path in pip_wheels_in_build_ctx %}
-COPY {{ path }} /tmp/wheels
-{% endfor %}
-{% endif %}
-
-
-{% if pip_wheels_in_build_ctx|length > 0 %}
-RUN rm -rf /tmp/wheels
-{% endif %}
-
-COPY . .
 {% for src, dest in copy_files %}
-COPY {{ src }} {{ dest }}
+COPY --link {{ src.as_posix() }} {{ dest }}
 {% endfor %}

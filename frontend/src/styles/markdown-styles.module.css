@@ -1,0 +1,13 @@
+.reactMarkdown{
+    margin-left:10px;
+    max-width: 100%;
+    word-break: break-all;
+    white-space: pre-wrap; /* Don't forget this one */
+    text-overflow: ellipsis;
+}
+
+.markdown code {
+    display: block;
+    white-space: pre-wrap;
+  }
+  

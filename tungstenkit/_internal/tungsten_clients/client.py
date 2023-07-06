@@ -92,12 +92,12 @@ class TungstenClient:
             )
             log_info("")
 
-            if model.source_files and model.source_files.files:
-                source_files, skipped_source_files = self.api.upload_model_source_files(
-                    project=project, files=model.source_files.files
-                )
-            else:
-                source_files, skipped_source_files = [], []
+            # if model.source_files and model.source_files.files:
+            #     source_files, skipped_source_files = self.api.upload_model_source_files(
+            #         project=project, files=model.source_files.files
+            #     )
+            # else:
+            #     source_files, skipped_source_files = [], []
 
             log_info(f"Creating a model in {self.api.base_url}")
             req = schemas.ModelCreate(
@@ -116,12 +116,12 @@ class TungstenClient:
             model_in_server = self.api.create_model(project=project, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
 
-            if model.readme:
-                log_info("Updating the README")
-                self.api.update_model_readme(
-                    project=project, version=model_in_server.version, readme=model.readme
-                )
-                log_info("")
+            # if model.readme:
+            #     log_info("Updating the README")
+            #     self.api.update_model_readme(
+            #         project=project, version=model_in_server.version, readme=model.readme
+            #     )
+            #     log_info("")
 
         finally:
             docker_client.images.remove(image=f"{remote_docker_repo}:{remote_docker_tag}")
@@ -149,26 +149,28 @@ class TungstenClient:
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
 
-            if model_in_server.readme_url:
-                readme_image_dir = tmp_dir / "readme_images"
-                readme_image_dir.mkdir()
-                log_info("Fetching the README")
-                readme = self.api.get_model_readme(
-                    project=project, version=model_version, image_download_dir=tmp_dir
-                )
-                log_info("")
-            else:
-                readme = None
+            # if model_in_server.readme_url:
+            #     readme_image_dir = tmp_dir / "readme_images"
+            #     readme_image_dir.mkdir()
+            #     log_info("Fetching the README")
+            #     readme = self.api.get_model_readme(
+            #         project=project, version=model_version, image_download_dir=tmp_dir
+            #     )
+            #     log_info("")
+            # else:
+            #     readme = None
 
-            if model_in_server.source_files_count > 0:
-                source_files_dir = tmp_dir / "source_files"
-                source_files_dir.mkdir()
-                log_info("Fetching source files")
-                source_files = self.api.download_model_source_tree(
-                    project=project, version=model_version, root_dir=source_files_dir
-                )
-            else:
-                source_files = []
+            # if model_in_server.source_files_count > 0:
+            #     source_files_dir = tmp_dir / "source_files"
+            #     source_files_dir.mkdir()
+            #     log_info("Fetching source files")
+            #     source_files = self.api.download_model_source_tree(
+            #         project=project, version=model_version, root_dir=source_files_dir
+            #     )
+            # else:
+            #     source_files = []
+
+            readme, source_files = None, []
 
             avatar = self.api.get_project_avatar(project=project)
             io_data = storables.ModelIOData(

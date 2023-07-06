@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // output:"export",
-  // distDir: 'dist',  
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -11,6 +9,8 @@ const nextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
-}
+};
 
-module.exports = nextConfig
+// eslint-disable-next-line no-undef
+module.exports = nextConfig;
+

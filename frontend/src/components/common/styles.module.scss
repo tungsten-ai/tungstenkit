@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css?family=Montserrat');
+@import url('https://fonts.googleapis.com/css?family=Inter');
+@import url('https://fonts.googleapis.com/css?family=Courier+Prime');
+
+$font-size:18px;
+
+.NavBarContainer {
+    background-color: #0f1f37;
+    height: 75px;
+    display: flex;
+    align-items: center;
+    min-width:1200px;
+}
+
+.LogoContainer {
+    // height: 37.33%;
+    margin-left: 2rem;
+}
+
+.TungstenLogo {
+    object-fit: contain;
+    max-width: 9.5rem;
+    height:33px;
+    margin-top: 6px;
+}
+
+.RightEndIconsContainer {
+    display: flex;
+    justify-content: flex-end;
+    flex-grow: 1;
+    margin-right: 2.25rem;
+}
+
+.FlexContainer {
+    gap: 0.5rem;
+    justify-content: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.FlexContainerRightEnd {
+    gap: 1.5rem;
+    justify-content: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+}
+
+.NavBarButtons {
+    gap:2.1rem;
+    margin-left: 2.1rem;
+    align-items: center;
+}
+
+.NavBarCommonButtons {
+    background-color:transparent;
+    font-size: $font-size;
+    color:white;
+    font-family:Roboto,Helvetica,Arial,sans-serif;
+    letter-spacing: 0.02rem;
+    vertical-align:middle;
+}
+
+.RegisterButton {
+    margin-right: 1rem;
+    border: 1px solid white;
+    background-color:transparent;
+    font-size: $font-size;
+    color:white;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.33rem;
+    padding-bottom: 0.33rem;
+}
+
+.ProfileMenu {
+    margin-left: 2rem;
+    margin-right: 0.5rem;
+    padding: 0%;
+}
+
+.TextContentContainer .CopyButton{
+    visibility: hidden;
+}
+
+.TextContentContainer:hover .CopyButton{
+    visibility:visible;
+}
+
+.SearchBox {
+    box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
+    -webkit-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
+    -moz-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
+}

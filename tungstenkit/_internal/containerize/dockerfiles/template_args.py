@@ -28,7 +28,10 @@ class TemplateArgs:
     list_pip_install_args: t.List[t.List[str]] = attrs.field(factory=list)
 
     # Tungsten
+    tungsten_env_vars: t.Dict[str, str] = attrs.field(factory=dict)
     tungstenkit_dir_in_build_ctx: Path
     tungstenkit_dir_in_container: PurePosixPath = attrs.field(default=TUNGSTEN_DIR_IN_CONTAINER)
     home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
+    large_files: t.List[Path] = attrs.field(factory=list)
+    small_files: t.List[Path] = attrs.field(factory=list)
     copy_files: t.List[t.Tuple[str, str]] = attrs.field(factory=list)

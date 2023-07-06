@@ -104,10 +104,10 @@ def _add_api_endpoints(
     def get_model_metadata(req: Request):
         return schemas.Metadata.build(model=model_data, file_service=file_service, request=req)
 
-    @app.post("/predictions", response_model=schemas.PostPredictionResponse)
-    def create_prediction(body: schemas.PostPredictionRequest):
+    @app.post("/predictions", response_model=schemas.Prediction)
+    def create_prediction(body: schemas.PostPredictionRequest, req: Request):
         prediction_id = prediction_service.create_prediction(input=body.__root__)
-        return schemas.PostPredictionResponse(prediction_id=prediction_id)
+        return prediction_service.get_prediction_by_id(prediction_id, req)
 
     @app.get("/predictions/{prediction_id}", response_model=schemas.Prediction)
     def get_prediction(prediction_id: str, req: Request):

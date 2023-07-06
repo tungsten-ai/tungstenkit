@@ -13,6 +13,8 @@ from .common import GPUPackageConstraint, GPUPackageRelease
 
 
 class GPUPackageCollection(abc.ABC):
+    requires_system_cuda: bool
+
     @classmethod
     def init(cls):
         # TODO call from_file or from_remote periodically
@@ -47,10 +49,6 @@ class GPUPackageCollection(abc.ABC):
 
     @classmethod
     def get_pkg_names(cls) -> t.Set[str]:
-        raise NotImplementedError
-
-    @classmethod
-    def requires_system_cuda(cls) -> bool:
         raise NotImplementedError
 
     @classmethod

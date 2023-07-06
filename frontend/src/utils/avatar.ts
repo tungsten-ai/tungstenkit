@@ -1,8 +1,10 @@
-export function stringToColor(string:string) {
+import MD5 from "crypto-js/md5";
+
+const GRAVATAR_BASE_URL = "https://www.gravatar.com";
+
+export function stringToColor(string: string) {
   let hash = 0;
   let i;
-  
-  if (!string) return "#000000"
 
   /* eslint-disable no-bitwise */
   for (i = 0; i < string.length; i += 1) {
@@ -17,4 +19,20 @@ export function stringToColor(string:string) {
   }
   /* eslint-enable no-bitwise */
   return color;
+}
+
+export function buildGravatarURL(
+  hashKey: string,
+  defaultTheme: string,
+  size: number,
+  extension = ".png",
+) {
+  const sizeString = Math.round(size).toString();
+  const digestString = MD5(hashKey).toString();
+  const url = new URL("/avatar/" + digestString + extension, GRAVATAR_BASE_URL);
+
+  url.searchParams.set("d", defaultTheme);
+  url.searchParams.set("s", sizeString);
+
+  return url;
 }

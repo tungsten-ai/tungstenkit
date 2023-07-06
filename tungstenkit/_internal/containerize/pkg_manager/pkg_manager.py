@@ -31,6 +31,7 @@ class GPUCollectionStatus:
     py_vers: t.Set[Version] = attrs.field(factory=set)
 
 
+# TODO track history and show kind err msg
 @attrs.frozen
 class UpdateHistory:
     name: str
@@ -40,13 +41,16 @@ class UpdateHistory:
     err_msg: t.Optional[str] = attrs.field(default=None)
 
 
-# TODO update only when required.
 @attrs.frozen
 class PythonPackageManager:
     _gpu_pkg_collections: t.Dict[str, GPUPackageCollection] = attrs.field(factory=dict, init=False)
     _required_gpu_pkg_names: t.Dict[str, t.Set[str]] = attrs.field(factory=dict, init=False)
     _update_history: t.List[UpdateHistory] = attrs.field(factory=list, init=False)
     _extra_pkgs: t.List[PipRequirement] = attrs.field(factory=list, init=False)
+
+    @property
+    def requires_system_cuda(self):
+        return any(col.requires_system_cuda for col in self._gpu_pkg_collections.values())
 
     def add_requirement_str(self, requirement_str: str):
         # Parse requirement string

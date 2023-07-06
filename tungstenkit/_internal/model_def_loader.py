@@ -75,8 +75,8 @@ class ModelDefLoader(abc.ABC):
                 )
             )
 
-        c.environment_variables["TUNGSTEN_MODEL_MODULE"] = self.model_class.__module__
-        c.environment_variables["TUNGSTEN_MODEL_CLASS"] = self.model_class.__name__
+        c.tungsten_environment_variables["TUNGSTEN_MODEL_MODULE"] = self.model_class.__module__
+        c.tungsten_environment_variables["TUNGSTEN_MODEL_CLASS"] = self.model_class.__name__
         return c
 
     @abc.abstractmethod

@@ -1,8 +1,8 @@
 {% import 'macros/cache.j2' as cache %}
 
-COPY {{ tungstenkit_dir_in_build_ctx.as_posix()}} {{ tungstenkit_dir_in_container.as_posix()}}
-
-RUN {{ cache.mount_pip_cache() }} cd {{ tungstenkit_dir_in_container.as_posix()}} && pip install .
+{% if tungsten_env_vars %}
+ENV{% for key, val in tungsten_env_vars.items() %} {{ key }}={{ val }}{% endfor %}
+{% endif %}
 
 ENTRYPOINT ["/usr/bin/tini","--","python"{% for e in python_entrypoint.split() %},"{{ e }}"{% endfor %}]
 

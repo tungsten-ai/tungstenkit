@@ -1,4 +1,4 @@
-const syntaxHighlighterStyles={
+const test:any={
     "hljs": {
       "display": "block",
       "overflowX": "auto",
@@ -95,4 +95,4 @@ const syntaxHighlighterStyles={
     }
   };
 
-export default syntaxHighlighterStyles
+export default test

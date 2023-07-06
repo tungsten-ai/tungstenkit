@@ -1,3 +1,6 @@
+# TODO complete this
+# Goal: Prevent fetching metadata everytime
+
 import typing as t
 from datetime import datetime
 from pathlib import Path

@@ -1,34 +1,36 @@
-import '@/styles/globals.css'
-import type { AppProps } from 'next/app'
-import { wrapper } from "@/redux/store";
+/* eslint-disable @typescript-eslint/no-shadow */
 import { MantineProvider } from "@mantine/core";
-import { ThemeProvider } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider } from "react-query";
-import "../styles/App.css";
-import theme from "@/styles/mui-theme";
-import { Provider } from "react-redux";
+import { NextPage } from "next";
+import customMantineTheme from "@/styles/mantine-theme";
+import type { AppProps } from "next/app";
 
-function App({ Component, pageProps }: AppProps) {
+import "../styles/App.css";
+import { Notifications } from "@mantine/notifications";
+import { ReactNode, ReactElement } from "react";
+
+export type NextPageWithLayout<P = NonNullable<unknown>, IP = P> = NextPage<P, IP> & {
+  getLayout?: (page: ReactElement, pageProps: object) => ReactNode;
+};
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout;
+};
+
+function App({ Component, pageProps }: AppPropsWithLayout) {
   const queryClient = new QueryClient();
-  const { store, props } = wrapper.useWrappedStore(pageProps);
+
+  const getLayout = Component.getLayout ?? ((page) => page);
+  const componentWithLayout = getLayout(<Component {...pageProps} />, pageProps);
 
   return (
-    <>
-      <Provider store={store}>
-        <MantineProvider
-          withGlobalStyles
-          withNormalizeCSS
-          theme={{
-            colorScheme: "light",
-          }}
-        >
-          <ThemeProvider theme={theme}>
-            <QueryClientProvider client={queryClient}><Component {...pageProps} /></QueryClientProvider>
-          </ThemeProvider>
-        </MantineProvider>
-        </Provider>
-    </>
+    <QueryClientProvider client={queryClient}>
+      <MantineProvider withGlobalStyles withNormalizeCSS theme={customMantineTheme}>
+        <Notifications />
+        {componentWithLayout}
+      </MantineProvider>
+    </QueryClientProvider>
   );
 }
 
-export default wrapper.withRedux(App);
+export default App;

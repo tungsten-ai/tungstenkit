@@ -159,4 +159,5 @@ cython_debug/
 #.idea/
 
 .pypirc
-.tungsten-build-*
+.tungsten-build*
+/*.png
