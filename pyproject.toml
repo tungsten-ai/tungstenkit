@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tungstenkit"
-version = "0.1.1a2"
+version = "0.1.1"
 description = "ML container made simple"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
 homepage = "https://github.com/tungsten-ai/tungstenkit"
