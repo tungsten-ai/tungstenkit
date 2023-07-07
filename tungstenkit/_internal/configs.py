@@ -42,7 +42,21 @@ def _default_include_files():
 
 
 def _default_exclude_files():
-    return [".*/", "__pycache__", "*.pyc", "*.pyo", "*.pyd"]
+    return [
+        ".*/",
+        "__pycache__",
+        "*.pyc",
+        "*.pyo",
+        "*.pyd",
+        ".venv",
+        "venv",
+        ".env",
+        "env",
+        ".git*",
+        ".vscode",
+        ".*cache",
+        ".ipynb_checkpoints",
+    ]
 
 
 # TODO print warnings if there are ignored fields

@@ -1,22 +1,20 @@
-import os
 import typing as t
-from pathlib import Path
 from typing import Optional
 
 from rich import print as rprint
 
 from tungstenkit import exceptions
 from tungstenkit._internal import model_store
-from tungstenkit._internal.constants import default_model_repo
 from tungstenkit._internal.utils import regex
 
 
-def project_name_callback(ctx, param, project_name: str) -> str:
+def push_target_callback(ctx, param, project_name: str) -> str:
     slash_separated = project_name.split("/")
     if len(slash_separated) != 2:
         raise exceptions.InvalidName(
-            f"Invalid project name: {project_name}\nFormat: <namespace slug>/<project slug> "
-            "(e.g., exampleuser/exampleproject)"
+            f"Invalid push target: {project_name}. It should be a project name or a model name"
+            " in a project"
+            " (e.g., exampleuser/exampleproject or exampleuser/exampleproject:exampleversion)"
         )
     return project_name
 
@@ -52,24 +50,6 @@ def stored_model_name_callback(ctx, param, model_name: t.Optional[str]) -> str:
             raise exceptions.NotFound(f"model '{model_name}'")
         return m.name
 
-    wd = Path(os.getcwd()).resolve().parts[-1]
-
-    try:
-        default_repo = default_model_repo()
-        rprint(
-            f"Finding the latest model image built in the directory '{wd}' "
-            f"(tag: '{default_repo}:latest')... ",
-            end="",
-        )
-
-        model_store.get(f"{default_repo}:latest")
-        rprint("[bold green]succeeded[/bold green]")
-        return f"{default_repo}:latest"
-
-    except exceptions.NotFound:
-        rprint("[bold red]failed[/bold red]")
-
-    # TODO prompt to request to ask whether to use the latest model or not
     rprint("Finding the latest model image... ", end="")
     models = sorted(model_store.list(), key=lambda m: m.created_at, reverse=True)
 

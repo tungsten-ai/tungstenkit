@@ -177,7 +177,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             "gitwildmatch", self.config.exclude_files + [tmp_dir_in_build_ctx.as_posix()]
         )
 
-        def split(curr_dir: Path):
+        def split(curr_dir: Path) -> t.Tuple[t.List[Path], t.List[Path]]:
             large_files, small_files = [], []
             for path in curr_dir.iterdir():
                 if not include_spec.match_file(path.as_posix()) or exclude_spec.match_file(
@@ -202,9 +202,28 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
             return large_files, small_files
 
-        return split(curr_dir)
+        large_files, small_files = split(curr_dir)
+        large_files = sorted(
+            large_files,
+            key=lambda path: (_get_size_of_copy_target(path), path.name),
+            reverse=True,
+        )
+        small_files = sorted(
+            small_files,
+            key=lambda path: (_get_size_of_copy_target(path), path.name),
+            reverse=True,
+        )
+        return large_files, small_files
 
     @classmethod
     @abc.abstractmethod
     def python_entrypoint(cls) -> str:
         pass
+
+
+def _get_size_of_copy_target(path: Path):
+    if path.is_dir():
+        size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
+    else:
+        size = path.stat(follow_symlinks=False).st_size
+    return size

@@ -86,10 +86,6 @@ class UnknownModuleFinder(importlib.abc.MetaPathFinder):
         self._loader = loader
 
     def find_spec(self, fullname, path, target=None):
-        if self._loader.is_registered(fullname):
-            return self._gen_spec(fullname)
-
-    def _gen_spec(self, fullname):
         spec = importlib.machinery.ModuleSpec(fullname, self._loader)
         return spec
 
@@ -99,21 +95,9 @@ class UnknownModuleLazyLoader(importlib.abc.Loader):
         self._help_msg_on_err = help_msg_on_err
         self._registered: Dict[str, UnknownModule] = dict()
 
-    def register(self, fullname: str, module_attr: Optional[str] = None):
-        dot_separated = fullname.split(".")
-        for i in range(len(dot_separated)):
-            name = ".".join(dot_separated[: i + 1])
-            if importlib.util.find_spec(name) is None:
-                self._registered[name] = UnknownModule(name, self._help_msg_on_err)
-        if fullname in self._registered and module_attr:
-            self._registered[fullname]._add(module_attr)
-
-    def is_registered(self, fullname: str):
-        return fullname in self._registered
-
     def create_module(self, spec):
-        if spec.name in self._registered:
-            return self._registered[spec.name]
+        self._registered[spec.name] = UnknownModule(spec.name, self._help_msg_on_err)
+        return self._registered[spec.name]
 
     def exec_module(self, module):
         pass
@@ -160,17 +144,11 @@ def get_imports(path):
 
 
 @contextmanager
-def lazy_import_ctx(imports: List[Import], help_msg_on_err: Optional[str] = None):
+def lazy_import_ctx(help_msg_on_err: Optional[str] = None):
     loader = UnknownModuleLazyLoader(help_msg_on_err)
     finder = UnknownModuleFinder(loader)
     try:
         sys.meta_path.append(finder)
-        for imp in imports:
-            if imp.module:
-                attr_name = ".".join(imp.name)
-                loader.register(".".join(imp.module), attr_name if attr_name else None)
-            else:
-                loader.register(".".join(imp.name))
         yield
     finally:
         for module_name in loader._registered.keys():
@@ -191,10 +169,13 @@ def import_module_in_lazy_import_ctx(
         raise ModuleNotFoundError(
             f"Failed to initialize module '{module}'. Is it a Python module?"
         )
-    imports = get_imports(spec.origin)
-    with lazy_import_ctx(imports, help_msg_on_unknown_module_exec):
+    try:
         mod = importlib.import_module(module)
         return mod
+    except ModuleNotFoundError:
+        with lazy_import_ctx(help_msg_on_unknown_module_exec):
+            mod = importlib.import_module(module)
+            return mod
 
 
 def check_module(module: str) -> bool:

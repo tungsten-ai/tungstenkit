@@ -32,6 +32,8 @@ class ModelCreate(BaseModel):
     skipped_source_files: List[SkippedSourceFileDecl] = Field(default_factory=list)
 
     gpu_memory: int
+    vm: Optional[str] = None
+    version: Optional[str] = None
 
 
 class ModelCreator(BaseModel):

@@ -25,7 +25,7 @@ from tungstenkit._internal.utils.string import removeprefix
 from .callbacks import (
     input_fields_callback,
     model_name_validator,
-    project_name_callback,
+    push_target_callback,
     remote_model_name_callback,
     stored_model_name_callback,
 )
@@ -309,7 +309,7 @@ def extract(model_name: str, save_dir: str, **kwargs):
 
 
 @model.command()
-@click.argument("project", callback=project_name_callback)
+@click.argument("target", callback=push_target_callback)
 @click.option(
     "--model-name",
     "-n",
@@ -317,17 +317,27 @@ def extract(model_name: str, save_dir: str, **kwargs):
     callback=stored_model_name_callback,
 )
 @common_options
-def push(project: str, model_name: str, **kwargs):
+def push(target: str, model_name: str, **kwargs):
     """
     Push a model
 
-    'PROJECT' should be in the '<namespace>/<project>' format
+    \b
+    Examples:
+    - tungsten push exampleuser/exampleproject
+    - tungsten push exampleuser/exampleproject:exampleversion
+    - tungsten push exampleuser/exampleproject:exampleversion -n localmodel:latest
     """
-    # TODO validate project
-    # TODO print the pushed model in server
+    splitted = target.split(":")
+    if len(splitted) > 1:
+        project = splitted[0]
+        version = splitted[1]
+    else:
+        project = target
+        version = None
+
     tungsten_client = TungstenClient.from_env()
     print(TUNGSTEN_LOGO)
-    tungsten_client.push_model(model_name=model_name, project=project)
+    tungsten_client.push_model(model_name=model_name, project=project, version=version)
 
 
 @model.command()

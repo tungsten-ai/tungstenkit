@@ -72,6 +72,7 @@ class TungstenClient:
         self,
         model_name: str,
         project: str,
+        version: t.Optional[str] = None,
     ) -> schemas.Model:
         if not self.api.check_if_project_exists(project):
             raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
@@ -109,6 +110,7 @@ class TungstenClient:
                 output_filetypes=model.io.output_filetypes,
                 demo_output_filetypes=model.io.demo_output_filetypes,
                 gpu_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu and model.gpu_mem_gb else 0,
+                version=version,
                 # source_files=source_files,
                 # skipped_source_files=skipped_source_files,
             )

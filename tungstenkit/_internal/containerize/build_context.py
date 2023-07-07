@@ -216,36 +216,37 @@ def _convert_abs_symlinks_to_rel(
         pattern = link_path.relative_to(abs_path_to_build_dir).as_posix()
         if include_spec.match_file(pattern) and not exclude_spec.match_file(pattern):
             orig_target = Path(os.readlink(str(link_path)))
+
+            if not orig_target.is_absolute():
+                continue
+
             if not orig_target.exists():
                 log_warning(f"Target of symbolic link '{link_path}' does not exist")
                 continue
 
-            if orig_target.is_absolute():
-                try:
-                    orig_target.relative_to(abs_path_to_build_dir)
-                except ValueError:
-                    raise exceptions.BuildError(
-                        f"Target '{orig_target}' of link '{link_path}' is outside build dir at "
-                        f"'{abs_path_to_build_dir}'"
-                    )
-                tmp_link_path = (
-                    abs_path_to_build_dir
-                    / rel_path_to_tmp_dir
-                    / "symlinks"
-                    / link_path.relative_to(abs_path_to_build_dir)
+            try:
+                orig_target.relative_to(abs_path_to_build_dir)
+            except ValueError:
+                raise exceptions.BuildError(
+                    f"Target '{orig_target}' of link '{link_path}' is outside build dir at "
+                    f"'{abs_path_to_build_dir}'"
                 )
-                new_target = os.path.relpath(orig_target, start=tmp_link_path)
-                tmp_link_path.parent.mkdir(parents=True, exist_ok=True)
-                os.symlink(new_target, tmp_link_path)
-                log_debug(
-                    f"Change target of link '{link_path}': '{orig_target}' -> '{new_target}'"
+            tmp_link_path = (
+                abs_path_to_build_dir
+                / rel_path_to_tmp_dir
+                / "symlinks"
+                / link_path.relative_to(abs_path_to_build_dir)
+            )
+            new_target = os.path.relpath(orig_target, start=tmp_link_path)
+            tmp_link_path.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(new_target, tmp_link_path)
+            log_debug(f"Change target of link '{link_path}': '{orig_target}' -> '{new_target}'")
+            link_and_target_pairs.append(
+                (
+                    str(tmp_link_path),
+                    link_path.relative_to(abs_path_to_build_dir).as_posix(),
                 )
-                link_and_target_pairs.append(
-                    (
-                        str(tmp_link_path),
-                        link_path.relative_to(abs_path_to_build_dir).as_posix(),
-                    )
-                )
+            )
 
     return link_and_target_pairs
 
