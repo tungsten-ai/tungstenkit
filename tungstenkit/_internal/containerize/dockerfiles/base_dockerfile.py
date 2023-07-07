@@ -16,8 +16,7 @@ from ..gpu_pkg_collections import supported_gpu_pkg_names
 from ..pkg_manager import PythonPackageManager, RequirementsTxt
 from .template_args import TemplateArgs
 
-# LARGE_FILE_THRESHOLD = 100 * 1024**2
-LARGE_FILE_THRESHOLD = 10 * 1024
+LARGE_FILE_THRESHOLD = 100 * 1024**2
 
 
 class BaseDockerfile(metaclass=abc.ABCMeta):
