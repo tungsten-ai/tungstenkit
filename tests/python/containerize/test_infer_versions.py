@@ -201,7 +201,7 @@ def test_infer_gpu_pkg_ver():
     py_ver = pkg_manager.infer_python_ver()
     pkg_manager.set_python_equal_to(py_ver)
     requirements = pkg_manager.list_gpu_pkg_pip_requirements()
-    assert any(r.name == "a" and r.version == Version("0.1.2+cu116") for r in requirements)
+    assert any(r.name == "a" and r.spec == Version("0.1.2+cu116") for r in requirements)
     pkg_manager = PythonPackageManager()
 
     pkg_manager = PythonPackageManager()
@@ -213,7 +213,7 @@ def test_infer_gpu_pkg_ver():
     py_ver = pkg_manager.infer_python_ver()
     pkg_manager.set_python_equal_to(py_ver)
     requirements = pkg_manager.list_gpu_pkg_pip_requirements()
-    assert any(r.name == "b" and r.version == Version("1.1.1+cu116") for r in requirements)
+    assert any(r.name == "b" and r.spec == Version("1.1.1+cu116") for r in requirements)
 
     pkg_manager = PythonPackageManager()
     pkg_manager.add_requirement_str("a")
@@ -224,5 +224,5 @@ def test_infer_gpu_pkg_ver():
     py_ver = pkg_manager.infer_python_ver()
     pkg_manager.set_python_equal_to(py_ver)
     requirements = pkg_manager.list_gpu_pkg_pip_requirements()
-    assert any(r.name == "a" and r.version == Version("0.1.3+cu117") for r in requirements)
-    assert any(r.name == "b" and r.version == Version("1.1.2+cu117") for r in requirements)
+    assert any(r.name == "a" and r.spec == Version("0.1.3+cu117") for r in requirements)
+    assert any(r.name == "b" and r.spec == Version("1.1.2+cu117") for r in requirements)

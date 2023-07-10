@@ -8,7 +8,10 @@ from tungstenkit._internal import model_store
 from tungstenkit._internal.utils import regex
 
 
-def push_target_callback(ctx, param, project_name: str) -> str:
+def push_target_callback(ctx, param, project_name: str) -> t.Optional[str]:
+    if not project_name:
+        return None
+
     slash_separated = project_name.split("/")
     if len(slash_separated) != 2:
         raise exceptions.InvalidName(
@@ -20,17 +23,15 @@ def push_target_callback(ctx, param, project_name: str) -> str:
 
 
 def remote_model_name_callback(ctx, param, model_name: str) -> str:
-    format_help_msg = (
-        "Format of remote model name: <namespace slug>/<project slug>:<model version>"
-    )
+    format_help_msg = "Format of remote model name: [<namespace>/]<project>[:<version>]"
     invalid_format_msg = f"Invalid remote model name: {model_name}\n" + format_help_msg
     colon_separated = model_name.split(":")
-    if len(colon_separated) != 2:
+    if len(colon_separated) > 2:
         raise exceptions.InvalidName(invalid_format_msg)
 
     full_slug = colon_separated[0]
     slash_separated = full_slug.split("/")
-    if len(slash_separated) != 2:
+    if len(slash_separated) > 2:
         raise exceptions.InvalidName(invalid_format_msg)
 
     return model_name

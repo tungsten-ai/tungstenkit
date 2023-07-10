@@ -71,11 +71,23 @@ class TungstenClient:
     def push_model(
         self,
         model_name: str,
-        project: str,
+        project_full_slug: str,
         version: t.Optional[str] = None,
     ) -> schemas.Model:
-        if not self.api.check_if_project_exists(project):
-            raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
+        project_in_server = self.api.get_project(project_full_slug)
+        if project_in_server is None:
+            raise exceptions.NotFound(f"No project '{project_full_slug}' in {self.api.base_url}")
+
+        if version:
+            try:
+                self.api.get_model(project_full_slug, version)
+                raise exceptions.Conflict(
+                    f"Version '{version}' already exists in project '{project_full_slug}'. "
+                    "Please retry after removing the model."
+                )
+            except exceptions.TungstenClientError as e:
+                if e.status_code != 404:
+                    raise e
 
         model = storables.ModelData.load(model_name)
         docker_image_id = model.docker_image_id
@@ -115,7 +127,7 @@ class TungstenClient:
                 # skipped_source_files=skipped_source_files,
             )
 
-            model_in_server = self.api.create_model(project=project, req=req)
+            model_in_server = self.api.create_model(project_full_slug=project_full_slug, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
 
             # if model.readme:
@@ -131,23 +143,41 @@ class TungstenClient:
         log_info("")
         print_success(
             f"Successfully pushed '{model.name}' to '{self.api.base_url}'\n"
-            f" - project: [green]{project}[/green]\n"
+            f" - project: [green]{project_full_slug}[/green]\n"
             f" - version: [green]{model_in_server.version}[/green]"
         )
         return model_in_server
 
-    def pull_model(self, project: str, model_version: str) -> storables.ModelData:
-        if not self.api.check_if_project_exists(project):
-            raise exceptions.NotFound(f"No project '{project}' in {self.api.base_url}")
+    def pull_model(
+        self, project_full_slug: str, model_version: t.Optional[str] = None
+    ) -> storables.ModelData:
+        project_in_server = self.api.get_project(project_full_slug)
+        if project_in_server is None:
+            raise exceptions.NotFound(f"No project '{project_full_slug}' in {self.api.base_url}")
 
-        model_in_server = self.api.get_model(project=project, version=model_version)
+        if model_version:
+            model_in_server = self.api.get_model(
+                project_full_slug=project_full_slug, version=model_version
+            )
+        else:
+            latest_model = self.api.get_latest_model(project_full_slug=project_full_slug)
+            if latest_model is None:
+                raise exceptions.NotFound(f"No model in project '{project_full_slug}'")
+            model_in_server = latest_model
+            model_version = model_in_server.version
+
         repo_name, tag = model_in_server.docker_image.split(":", maxsplit=1)
         remote_docker_repo = f"{self.docker_registry}/{repo_name}"
-        local_model_name = f"{remote_docker_repo}:{tag}"
+        local_model_name = f"{project_full_slug}:{model_version}"
 
         docker_client = get_docker_client(timeout=DOCKER_CLIENT_TIMEOUT)
         log_info("Pulling the model image")
         self._pull_from_docker_registry(remote_docker_repo, tag, docker_client=docker_client)
+
+        image = docker_client.images.get(remote_docker_repo + ":" + tag)
+        image.tag(project_full_slug, model_version)
+        docker_client.images.remove(remote_docker_repo + ":" + tag)
+
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
 
@@ -174,7 +204,7 @@ class TungstenClient:
 
             readme, source_files = None, []
 
-            avatar = self.api.get_project_avatar(project=project)
+            avatar = self.api.fetch_project_avatar(project_full_slug, project_in_server.avatar_url)
             io_data = storables.ModelIOData(
                 input_schema=model_in_server.input_schema,
                 output_schema=model_in_server.output_schema,
@@ -193,7 +223,7 @@ class TungstenClient:
             m.save(file_blob_create_policy="rename")
 
             log_info("")
-            print_success(f"Successfully pulled '{remote_docker_repo}:{tag}'")
+            print_success(f"Successfully pulled '{project_full_slug}:{model_version}'")
             return storables.ModelData.load(local_model_name)
 
     def _push_to_docker_registry(self, repo: str, tag: str, docker_client: DockerClient):

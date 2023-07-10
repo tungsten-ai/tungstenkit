@@ -67,51 +67,72 @@ class TungstenAPIClient:
         _check_resp(resp, f.url, "Failed to fetch user info")
         return schemas.User.parse_raw(resp.text)
 
-    def check_if_project_exists(self, project: str) -> bool:
+    def get_project(self, project_full_slug: str) -> t.Optional[schemas.Project]:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
         if resp.status_code == 404:
-            return False
+            return None
 
-        _check_resp(resp, f.url, f"Failed to check existence of project '{project}'")
-        return True
+        _check_resp(resp, f.url, f"Project not found: '{project_full_slug}'")
+        return schemas.Project.parse_raw(resp.text)
 
-    def get_project_avatar(self, project: str) -> storables.AvatarData:
-        f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "avatar"
-        log_request(url=f.url, method="GET")
-        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
+    def fetch_project_avatar(
+        self, project_full_slug: str, avatar_url: str
+    ) -> storables.AvatarData:
+        log_request(url=avatar_url, method="GET")
+        resp = self.sess.get(avatar_url, timeout=CONNECTION_TINEOUT)
         if resp.status_code == 404:
-            return storables.AvatarData.fetch_default(project + " avatar", avatar_domain=f.host)
+            return storables.AvatarData.fetch_default(
+                project_full_slug + " avatar", avatar_domain=self.base_url
+            )
 
-        _check_resp(resp, f.url, f"Failed to fetch the avatar of project '{project}'")
+        _check_resp(
+            resp, avatar_url, f"Failed to fetch the avatar of project '{project_full_slug}'"
+        )
         return storables.AvatarData(bytes_=resp.content, extension=".png")
 
-    def get_model(self, project: str, version: str) -> schemas.Model:
+    def get_model(self, project_full_slug: str, version: str) -> schemas.Model:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(resp, f.url, f"Failed to fetch info of model '{project}:{version}'")
+        _check_resp(resp, f.url, f"Failed to fetch info of model '{project_full_slug}:{version}'")
         return schemas.Model.parse_raw(resp.text)
 
-    def create_model(self, project: str, req: schemas.ModelCreate) -> schemas.Model:
+    def get_latest_model(self, project_full_slug: str) -> t.Optional[schemas.Model]:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models"
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug / "models"
+        f.args["per_page"] = str(1)
+        f.args["page"] = str(1)
+        f.args["order_by"] = "created_at"
+        f.args["sort"] = "desc"
+        log_request(url=f.url, method="GET")
+        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
+        _check_resp(resp, f.url, f"Failed to fetch model list in project '{project_full_slug}'")
+        model_list = schemas.ModelList.parse_raw(resp.text)
+        if len(model_list.__root__) == 0:
+            return None
+        return model_list.__root__[0]
+
+    def create_model(self, project_full_slug: str, req: schemas.ModelCreate) -> schemas.Model:
+        f = furl(self.base_url)
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug / "models"
         data = req.json()
         log_request(url=f.url, method="POST", data=data)
         resp = self.sess.post(f.url, data=data, timeout=CONNECTION_TINEOUT)
-        _check_resp(resp, f.url, f"Failed to create a model in project '{project}'")
+        _check_resp(resp, f.url, f"Failed to create a model in project '{project_full_slug}'")
         return schemas.Model.parse_raw(resp.text)
 
     def update_model_readme(
-        self, project: str, version: str, readme: storables.MarkdownData
+        self, project_full_slug: str, version: str, readme: storables.MarkdownData
     ) -> None:
         if len(readme.image_files) > 0:
             resps = self.upload_multiple_files_by_paths(
-                project=project, paths=readme.image_files, desc="Uploading image files in README"
+                project_full_slug=project_full_slug,
+                paths=readme.image_files,
+                desc="Uploading image files in README",
             )
             image_file_serving_urls = [r.serving_url for r in resps]
             readme_content = change_local_image_links_in_markdown(
@@ -121,22 +142,30 @@ class TungstenAPIClient:
             )
 
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "readme"
+        f.path = (
+            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "readme"
+        )
         log_request(url=f.url, method="PUT")
         data = schemas.ModelReadmeUpdate(content=readme_content).json()
         resp = self.sess.put(f.url, data=data, timeout=CONNECTION_TINEOUT)
         _check_resp(
-            resp, url=f.url, err_msg_prefix=f"Failed to upload README of model {project}:{version}"
+            resp,
+            url=f.url,
+            err_msg_prefix=f"Failed to upload README of model {project_full_slug}:{version}",
         )
 
     def get_model_readme(
-        self, project: str, version: str, image_download_dir: Path
+        self, project_full_slug: str, version: str, image_download_dir: Path
     ) -> storables.MarkdownData:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "readme"
+        f.path = (
+            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "readme"
+        )
         log_request(url=f.url, method="GET")
         resp = self.sess.get(url=f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(resp, f.url, f"Failed to get the README of model {project}:{version}")
+        _check_resp(
+            resp, f.url, f"Failed to get the README of model {project_full_slug}:{version}"
+        )
 
         md = resp.text
         image_http_links = get_image_links(md, schemes=["http", "https"])
@@ -152,35 +181,41 @@ class TungstenAPIClient:
             return storables.MarkdownData(content=md, image_files=downloaded)
         return storables.MarkdownData(content=md)
 
-    def get_model_source_tree(self, project: str, version: str) -> schemas.SourceTreeFolder:
+    def get_model_source_tree(
+        self, project_full_slug: str, version: str
+    ) -> schemas.SourceTreeFolder:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "tree"
+        f.path = (
+            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "tree"
+        )
         log_request(url=f.url, method="GET")
         resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
         _check_resp(
             resp,
             url=f.url,
-            err_msg_prefix=f"Failed to get the source tree of model {project}:{version}",
+            err_msg_prefix=f"Failed to get the source tree of model {project_full_slug}:{version}",
         )
         parsed = schemas.SourceTreeFolder.parse_raw(resp.text)
         return parsed
 
     def download_model_source_file(
-        self, project: str, version: str, path: str, root_dir: Path
+        self, project_full_slug: str, version: str, path: str, root_dir: Path
     ) -> Path:
         download_dir = (root_dir / path).parent
         download_dir.mkdir(exist_ok=True, parents=True)
 
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "models" / version / "files"
+        f.path = (
+            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "files"
+        )
         f.path.segments += [path]  # For url encoding
         log_request(url=f.url, method="GET")
         return download_file(url=f.url, out_path=download_dir, sess=self.sess)
 
     def download_model_source_tree(
-        self, project: str, version: str, root_dir: Path
+        self, project_full_slug: str, version: str, root_dir: Path
     ) -> t.List[storables.SourceFile]:
-        root = self.get_model_source_tree(project=project, version=version)
+        root = self.get_model_source_tree(project_full_slug=project_full_slug, version=version)
         urls: t.List[str] = []
         download_paths: t.List[Path] = []
         ret: t.List[storables.SourceFile] = []
@@ -198,7 +233,9 @@ class TungstenAPIClient:
                         else:
                             downloaded = root_dir / path / c.name
 
-                        urls.append(self._build_source_file_url(project, version, str(p)))
+                        urls.append(
+                            self._build_source_file_url(project_full_slug, version, str(p))
+                        )
                         download_paths.append(downloaded)
 
                     ret.append(
@@ -216,12 +253,14 @@ class TungstenAPIClient:
         return ret
 
     def upload_model_source_files(
-        self, project: str, files: t.Iterable[storables.SourceFile]
+        self, project_full_slug: str, files: t.Iterable[storables.SourceFile]
     ) -> t.Tuple[t.List[schemas.SourceFileDecl], t.List[schemas.SkippedSourceFileDecl]]:
         source_files, skipped_source_files = [], []
         upload_path_dict = {f: f.abs_path_in_host_fs for f in files if f.abs_path_in_host_fs}
         upload_resps = self.upload_multiple_files_by_paths(
-            project=project, paths=list(upload_path_dict.values()), desc="Uploading source files"
+            project_full_slug=project_full_slug,
+            paths=list(upload_path_dict.values()),
+            desc="Uploading source files",
         )
         upload_resp_dict = {f: url for f, url in zip(upload_path_dict.keys(), upload_resps)}
         for f in files:
@@ -247,8 +286,10 @@ class TungstenAPIClient:
         )
         return schemas.ServerMetadata.parse_raw(resp.text)
 
-    def upload_file_by_path(self, project: str, path: Path, desc: t.Optional[str] = None) -> str:
-        url = self.build_upload_url(project=project)
+    def upload_file_by_path(
+        self, project_full_slug: str, path: Path, desc: t.Optional[str] = None
+    ) -> str:
+        url = self.build_upload_url(project_full_slug=project_full_slug)
         log_request(url=url, method="POST")
         resp = upload_form_data_by_path(
             method="post",
@@ -265,13 +306,13 @@ class TungstenAPIClient:
 
     def upload_file_by_buffer(
         self,
-        project: str,
+        project_full_slug: str,
         buffer: io.BufferedIOBase,
         file_name: str,
         content_type: str,
         desc: t.Optional[str] = None,
     ) -> str:
-        url = self.build_upload_url(project=project)
+        url = self.build_upload_url(project_full_slug=project_full_slug)
         log_request(url=url, method="POST")
         resp = upload_form_data_by_buffer(
             method="post",
@@ -289,13 +330,13 @@ class TungstenAPIClient:
         return parsed.serving_url
 
     def upload_multiple_files_by_paths(
-        self, project: str, paths: t.List[Path], desc: t.Optional[str] = None
+        self, project_full_slug: str, paths: t.List[Path], desc: t.Optional[str] = None
     ) -> t.List[schemas.FileUploadResponse]:
         if len(paths) == 0:
             return []
 
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "uploads"
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug / "uploads"
         log_request(url=f.url, method="POST")
         responses = upload_multiple_form_data_by_paths(
             method="post",
@@ -337,9 +378,9 @@ class TungstenAPIClient:
             *urls, out=out, sess=self.sess, progress_bar=progress_bar, desc=desc
         )
 
-    def build_upload_url(self, project: str) -> str:
+    def build_upload_url(self, project_full_slug: str) -> str:
         f = furl(self.base_url)
-        f.path = f.path / API_BASE_STR / "projects" / project / "uploads"
+        f.path = f.path / API_BASE_STR / "projects" / project_full_slug / "uploads"
         return f.url
 
     def _set_auth_header(self, access_token: str):

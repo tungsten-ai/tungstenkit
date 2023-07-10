@@ -53,8 +53,8 @@ def build_model(
                 model_name = f"{repo_name}:{tag}"
 
                 # Build
-                tags = [model_name] if tag == "latest" else [model_name, f"{repo_name}:latest"]
-                build_ctx.build(tags=tags)
+                names = [model_name] if tag == "latest" else [model_name, f"{repo_name}:latest"]
+                build_ctx.build(tags=names)
 
                 # Add to the local store
                 io_schema = storables.ModelIOData(
@@ -70,13 +70,15 @@ def build_model(
                     readme = storables.MarkdownData.from_path(model_config.readme_md)
                 else:
                     readme = None
-                model_data = storables.ModelData(
-                    name=model_name,
-                    io_data=io_schema,
-                    avatar=avatar,
-                    readme=readme,
-                    id=id,
-                    source_files=build_ctx.walk_fs(),
-                )
+
+                for name in names:
+                    model_data = storables.ModelData(
+                        name=name,
+                        io_data=io_schema,
+                        avatar=avatar,
+                        readme=readme,
+                        id=id,
+                        source_files=build_ctx.walk_fs(),
+                    )
                 model_data.save()
                 return storables.ModelData.load(model_name)

@@ -73,6 +73,10 @@ class Model(BaseModel):
     created_at: datetime
 
 
+class ModelList(BaseModel):
+    __root__: List[Model]
+
+
 class ModelReadmeUpdate(BaseModel):
     content: str
 

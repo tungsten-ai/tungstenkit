@@ -17,6 +17,7 @@ from tungstenkit._internal.constants import (
 from tungstenkit._internal.containerize import build_model
 from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
+from tungstenkit._internal.storables import ModelData
 from tungstenkit._internal.tungsten_clients import TungstenClient
 from tungstenkit._internal.utils import docker
 from tungstenkit._internal.utils.console import print_pretty, print_success, yes_or_no_prompt
@@ -25,7 +26,6 @@ from tungstenkit._internal.utils.string import removeprefix
 from .callbacks import (
     input_fields_callback,
     model_name_validator,
-    push_target_callback,
     remote_model_name_callback,
     stored_model_name_callback,
 )
@@ -179,6 +179,32 @@ def list_models(**kwargs):
 
 
 @model.command()
+@click.argument("src", type=str, default="", callback=stored_model_name_callback)
+@click.argument("target", type=str, callback=model_name_validator)
+@common_options
+def tag(src: str, target: str, **kwargs):
+    """
+    Rename a model
+    """
+
+    m = model_store.get(src)
+    c = docker.get_docker_client()
+    img = c.images.get(m.name)
+    img.tag(target)
+    model_store.add(
+        ModelData(
+            name=target,
+            io_data=m.io,
+            avatar=m.avatar,
+            readme=m.readme,
+            source_files=m.source_files.files if m.source_files else None,
+        )
+    )
+
+    print_pretty(f"Tagged model '{src}' to '{target}'.")
+
+
+@model.command()
 @click.argument("model_name", type=str)
 @common_options
 def remove(model_name: str, **kwargs):
@@ -309,35 +335,33 @@ def extract(model_name: str, save_dir: str, **kwargs):
 
 
 @model.command()
-@click.argument("target", callback=push_target_callback)
-@click.option(
-    "--model-name",
-    "-n",
-    help="Name of the model in '<repo name>[:<tag>]' format",
-    callback=stored_model_name_callback,
-)
+@click.argument("model_name", type=str, default="", callback=stored_model_name_callback)
 @common_options
-def push(target: str, model_name: str, **kwargs):
+def push(model_name: str, **kwargs):
     """
     Push a model
 
     \b
-    Examples:
-    - tungsten push exampleuser/exampleproject
-    - tungsten push exampleuser/exampleproject:exampleversion
-    - tungsten push exampleuser/exampleproject:exampleversion -n localmodel:latest
+    'MODEL_NAME' should be in the '[<namespace>/]<project>:<version>' format.
+    The default value for <namespace> is the current user's username.
     """
-    splitted = target.split(":")
-    if len(splitted) > 1:
-        project = splitted[0]
-        version = splitted[1]
-    else:
-        project = target
-        version = None
+    splitted_by_colon = model_name.split(":")
+    project_full_slug = splitted_by_colon[0]
+    version = splitted_by_colon[1]
+
+    splitted_by_dash = project_full_slug.split("/")
+    if len(splitted_by_dash) > 2:
+        raise click.BadArgumentUsage(f"Invalid format: {model_name}")
 
     tungsten_client = TungstenClient.from_env()
+
+    if len(splitted_by_dash) == 1:
+        project_full_slug = tungsten_client.username + "/" + project_full_slug
+
     print(TUNGSTEN_LOGO)
-    tungsten_client.push_model(model_name=model_name, project=project, version=version)
+    tungsten_client.push_model(
+        model_name=model_name, project_full_slug=project_full_slug, version=version
+    )
 
 
 @model.command()
@@ -347,9 +371,24 @@ def pull(remote_model: str, **kwargs):
     """
     Pull a model
 
-    'REMOTE_MODEL' should be in the '<namespace>/<project>[:<version>]' format
+    \b
+    'REMOTE_MODEL' should be in the '[<namespace>/]<project>[:<version>]' format.
+    The default value for <namespace> is the current user's username.
+    If <version> is omitted, the latest version will be selected.
     """
-    project, version = remote_model.split(":", maxsplit=1)
+    splitted_by_colon = remote_model.split(":", maxsplit=1)
+    if len(splitted_by_colon) == 2:
+        project_full_slug, version = splitted_by_colon
+    else:
+        project_full_slug = splitted_by_colon[0]
+        version = None
+
+    tungsten_client = TungstenClient.from_env()
+
+    splitted_by_dash = project_full_slug.split("/")
+    if len(splitted_by_dash) == 1:
+        project_full_slug = tungsten_client.username + "/" + project_full_slug
+
     tungsten_client = TungstenClient.from_env()
     print(TUNGSTEN_LOGO)
-    tungsten_client.pull_model(project=project, model_version=version)
+    tungsten_client.pull_model(project_full_slug=project_full_slug, model_version=version)

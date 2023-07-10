@@ -8,6 +8,7 @@ from .model import (
     ListModelPredictionExamples,
     Model,
     ModelCreate,
+    ModelList,
     ModelPredictionExample,
     ModelPredictionExampleCreate,
     ModelReadmeUpdate,
@@ -16,5 +17,6 @@ from .model import (
     SourceTreeFile,
     SourceTreeFolder,
 )
+from .project import Project
 from .token import AccessToken
 from .user import User

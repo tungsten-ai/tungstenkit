@@ -6,6 +6,11 @@ from tungstenkit._internal.storables.model_data import ModelData, StoredModelDat
 _store = JSONCollection[StoredModelData](StoredModelData)
 
 
+def add(model: ModelData) -> None:
+    stored = model.save()
+    _store.add(stored)
+
+
 def get(name: str) -> ModelData:
     stored = _store.get(name)
     return ModelData.load_blobs(stored)

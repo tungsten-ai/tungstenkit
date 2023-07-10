@@ -1,5 +1,6 @@
 import abc
 import typing as t
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -30,7 +31,6 @@ class JSONStorable(BlobStorable[ItemType]):
             data = self.save_blobs(blob_store, file_blob_create_policy)
             store = self._get_store()
             store.add(data)
-            store.tag(data.name, data.repo_name + ":latest")
         return data
 
     @classmethod
@@ -83,6 +83,11 @@ class JSONItem(abc.ABC):
     def name(self) -> str:
         return self.repo_name + ":" + self.tag
 
+    @property
+    @abc.abstractmethod
+    def created_at(self) -> datetime:
+        pass
+
     @abc.abstractmethod
     def cleanup(self):
         pass
@@ -128,6 +133,8 @@ class JSONCollection(t.Generic[ItemType]):
             col.add(item)
             self._gc(col)
             col.save(self.collection_path)
+
+    # def get_latest_tag(self, repo: str):
 
     def tag(self, src_name: str, dest_name: str):
         src_repo, src_tag = self._item_type.parse_name(src_name)
@@ -265,12 +272,19 @@ class _JSONCollection(t.Generic[ItemType]):
         return self.items[id]
 
     def list(self) -> t.List[t.Tuple[str, str, ItemType]]:
-        ret = []
+        ret: t.List[t.Tuple[str, str, ItemType]] = []
         for repo_name in self.repositories.keys():
             for tag, id in self.repositories[repo_name].items():
                 item = self.items[id]
                 ret.append((repo_name, tag, item))
-        return ret
+        return sorted(ret, key=lambda val: (val[0], datetime.utcnow() - val[2].created_at))
+
+    def list_in_repo(self, repo_name: str) -> t.List[t.Tuple[str, ItemType]]:
+        ret: t.List[t.Tuple[str, ItemType]] = []
+        for tag, id in self.repositories[repo_name].items():
+            item = self.items[id]
+            ret.append((tag, item))
+        return sorted(ret, key=lambda val: val[1].created_at, reverse=True)
 
     def prune(
         self, candidate_ids: t.Optional[t.Iterable[str]] = None

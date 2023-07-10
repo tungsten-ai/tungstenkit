@@ -201,4 +201,4 @@ def test_push_model(
 
     with patch.object(TungstenClient, "_push_to_docker_registry", return_value=None):
         client = TungstenClient(url=BASE_URL, access_token=ACCESS_TOKEN)
-        client.push_model(dummy_model_data.name, project=PROJECT_FULLNAME)
+        client.push_model(dummy_model_data.name, project_full_slug=PROJECT_FULLNAME)

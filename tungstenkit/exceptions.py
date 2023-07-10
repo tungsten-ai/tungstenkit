@@ -90,6 +90,10 @@ class UploadError(TungstenException):
     pass
 
 
+class Conflict(TungstenException):
+    pass
+
+
 class BuildError(TungstenException):
     pass
 
