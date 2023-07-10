@@ -14,13 +14,9 @@ import { showFailureNotification } from "@/components/common/notifications";
 export default function ModelRunPage() {
   const axiosInstance = getClientSideAxios();
   const modelAPI = getModelAPI(axiosInstance);
-  const predictionAPI = getPredictionAPI(axiosInstance);
-
-  const cookies = new Cookies();
 
 
   const [model, setModel] = useState<Model | null>(null);
-  const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(null);
   
   useLayoutEffect(() => {
     async function load_model() {
@@ -34,20 +30,6 @@ export default function ModelRunPage() {
     load_model()
   }, [])
 
-  useEffect(() => {
-    const currentPredictionId = cookies.get("current_prediction") ?? null;
-    async function load_current_prediction() {
-      if (currentPredictionId) {
-        await predictionAPI
-          .get(currentPredictionId)
-          .then(({ data }) => {
-            setCurrentPrediction(data)
-          })
-          .catch(() => null);
-      }
-    }
-    load_current_prediction()
-  }, [model])
 
   return (
     <Box>
@@ -60,7 +42,6 @@ export default function ModelRunPage() {
           <ModelPageLayout model={model}>
             <ModelRun
               model={model}
-              currentPrediction={currentPrediction}
             />
           </ModelPageLayout>
         </>

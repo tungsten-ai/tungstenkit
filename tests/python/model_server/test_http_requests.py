@@ -56,7 +56,7 @@ def _test_predict(dummy_io_generator, server: ModelServer):
     # Failure
     inputs, gts = dummy_io_generator(n=4, structure_gts=True, failure=True)
     resp = _predict(inputs)
-    assert resp.status == "failure"
+    assert resp.status == "failed"
     assert resp.outputs is None
     assert resp.error_message
 
@@ -88,7 +88,7 @@ def _test_predict_async(dummy_io_generator, server: ModelServer):
     inputs, gts = dummy_io_generator(n=4, structure_gts=True, failure=True)
     prediction_id = create_pred(inputs)
     resps = wait_pred(prediction_id)
-    assert resps[-1].status == "failure"
+    assert resps[-1].status == "failed"
     assert resps[-1].outputs is None
     assert resps[-1].error_message
 
@@ -97,7 +97,7 @@ def _test_predict_async(dummy_io_generator, server: ModelServer):
     prediction_id = create_pred(inputs)
     cancel_pred(prediction_id)
     resps = wait_pred(prediction_id)
-    assert resps[-1].status == "failure"
+    assert resps[-1].status == "failed"
     assert resps[-1].outputs is None
     assert resps[-1].error_message
     inputs, gts = dummy_io_generator(n=4, structure_gts=True)
@@ -140,7 +140,7 @@ def _test_demo(dummy_io_generator, server: ModelServer):
     )
     prediction_id = create_pred(inputs)
     resps = wait_pred(prediction_id)
-    assert resps[-1].status == "failure"
+    assert resps[-1].status == "failed"
     assert resps[-1].outputs is None
     assert resps[-1].error_message
     assert any(
@@ -152,7 +152,7 @@ def _test_demo(dummy_io_generator, server: ModelServer):
     prediction_id = create_pred(inputs)
     cancel_pred(prediction_id)
     resps = wait_pred(prediction_id)
-    assert resps[-1].status == "failure"
+    assert resps[-1].status == "failed"
     assert resps[-1].outputs is None
     assert resps[-1].error_message
     inputs, gts = dummy_io_generator(n=4, delay=1, structure_gts=True, print_log=True)
@@ -188,7 +188,7 @@ def _wait_pred(
         else:
             raise NotImplementedError
         responses.append(resp)  # type: ignore
-        if resp.status == "success" or resp.status == "failure":
+        if resp.status == "success" or resp.status == "failed":
             break
         time.sleep(0.05)
     return responses

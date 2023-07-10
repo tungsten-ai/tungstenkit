@@ -149,12 +149,6 @@ def setup_build_ctx(
                 rel_path_to_tungstenkit.mkdir()
                 future_list: t.List[Future] = []
 
-                _copy_tungstenkit(
-                    build_dir=build_dir,
-                    rel_path_to_tungstenkit=rel_path_to_tungstenkit,
-                    executor=executor,
-                    future_list=future_list,
-                )
                 build_config.copy_files.extend(
                     _convert_abs_symlinks_to_rel(
                         build_dir,
@@ -179,7 +173,6 @@ def setup_build_ctx(
 
                 dockerfile = dockerfile_generator.generate(
                     tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
-                    tungstenkit_dir_in_build_ctx=rel_path_to_tungstenkit,
                 )
                 dockerfile_path = build_dir / rel_path_to_dockerfile
                 dockerfile_path.write_text(dockerfile)
@@ -312,31 +305,6 @@ def _copy_files(
 
     log_info("")
     return files_with_dest
-
-
-def _copy_tungstenkit(
-    build_dir: Path,
-    rel_path_to_tungstenkit: Path,
-    executor: ThreadPoolExecutor,
-    future_list: t.List[Future],
-):
-    requirements_txt_path = Path(__file__).parent / "metadata" / "tungstenkit" / "requirements.txt"
-    pyproject_toml_path = requirements_txt_path.with_name("pyproject.toml")
-    tungstenkit_dir_in_build_ctx = build_dir / rel_path_to_tungstenkit
-    requirements_txt_path_in_build_ctx = tungstenkit_dir_in_build_ctx / requirements_txt_path.name
-    pyproject_toml_path_in_build_ctx = tungstenkit_dir_in_build_ctx / pyproject_toml_path.name
-
-    src_dir = Path(tungstenkit.__file__).parent
-    shutil.copy(str(requirements_txt_path), str(requirements_txt_path_in_build_ctx))
-    shutil.copy(str(pyproject_toml_path), str(pyproject_toml_path_in_build_ctx))
-    future_list.append(
-        executor.submit(
-            shutil.copytree,
-            str(src_dir),
-            str(tungstenkit_dir_in_build_ctx / "tungstenkit"),
-            ignore=shutil.ignore_patterns("*.pyc"),  # TODO add more
-        )
-    )
 
 
 def _show_progress_while_copying_files(

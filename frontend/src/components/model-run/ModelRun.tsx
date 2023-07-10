@@ -14,18 +14,17 @@ import { ModelRunInputForm } from "./ModelRunInputForm";
 
 export interface ModelRunProps {
   model: Model;
-  currentPrediction: Prediction | null;
 }
 
 const FAILURE_MESSAGE = "Failed to run by unexpected server error";
 
-export default function ModelRun({ model, currentPrediction }: ModelRunProps) {
+export default function ModelRun({ model }: ModelRunProps) {
   const axiosInstance = getClientSideAxios();
   const predictionAPI = getPredictionAPI(axiosInstance);
 
   const cookies = new Cookies();
 
-  const [prediction, setPrediction] = useState<Prediction | null>(currentPrediction);
+  const [prediction, setPrediction] = useState<Prediction | null>(null);
   const { scrollIntoView: scrollIntoProgress, targetRef: progressRef } =
     useScrollIntoView<HTMLDivElement>({ axis: "y" });
 
@@ -41,7 +40,6 @@ export default function ModelRun({ model, currentPrediction }: ModelRunProps) {
     onSuccess: ({ data }) => {
       // TODO tab-specific cookie? or full client-side rendering to prevent flickering?
       cookies.set("current_prediction", data.id, { path: "/" });
-      console.log(data)
       setPrediction(data);
       scrollIntoProgress({ alignment: "start" });
     },
@@ -66,7 +64,6 @@ export default function ModelRun({ model, currentPrediction }: ModelRunProps) {
       <PredictionIOCard title="Input">
         <ModelRunInputForm
           model={model}
-          currentPrediction={currentPrediction}
           onFormSubmit={createPrediction.mutate}
           onError={() => showFailureNotification(FAILURE_MESSAGE)}
         />

@@ -40,7 +40,7 @@ class DummyModel:
 
         if self.failure:
             print("failed")
-            raise RuntimeError("failure")
+            raise RuntimeError("failed")
 
     def predict(self, inputs: t.List[DummyInput]) -> t.List[DummyOutput]:
         option = inputs[0].option
@@ -53,13 +53,13 @@ class DummyModel:
         for _ in range(num_sleeps):
             time.sleep(0.1)
         if any(inp.failure for inp in inputs):
-            raise RuntimeError("failure")
+            raise RuntimeError("failed")
         return [DummyOutput(output=input.text + "output") for input in inputs]
 
     @classmethod
     def exception(cls) -> t.Optional[RuntimeError]:
         if cls.failure:
-            return RuntimeError("failure")
+            return RuntimeError("failed")
         return None
 
     @staticmethod

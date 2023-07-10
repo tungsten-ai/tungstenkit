@@ -4,8 +4,6 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
-from .user import User
-
 
 class SourceFileDecl(BaseModel):
     path: str

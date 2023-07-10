@@ -102,7 +102,7 @@ class PredictionWorker(Thread):
         result = self._result_cache.get_result(prediction_id)
         status = result.status
         try:
-            if status == "failure" or status == "success":
+            if status == "failed" or status == "success":
                 return
 
             removed_input_ids = self._input_queue.remove(prediction_id=prediction_id)

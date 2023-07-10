@@ -3,7 +3,7 @@ import typing as t
 import attrs
 from typing_extensions import Literal
 
-PredictionStatus = Literal["pending", "running", "success", "failure"]
+PredictionStatus = Literal["pending", "running", "success", "failed"]
 
 
 @attrs.define(kw_only=True)

@@ -51,7 +51,7 @@ class PredInterface(abc.ABC):
 
         # Predict
         resp = self._predict(input_list)
-        if resp.status == "failure":
+        if resp.status == "failed":
             raise exceptions.PredictionFailure(
                 resp.error_message if resp.error_message else "unknown reason"
             )

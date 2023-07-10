@@ -62,7 +62,7 @@ class ModelContainerClient:
         prediction_id = self._api.create_demo(inputs)
         while True:
             result = self._api.get_demo(prediction_id)
-            if result.status == "success" or result.status == "failure":
+            if result.status == "success" or result.status == "failed":
                 break
 
             time.sleep(0.1)

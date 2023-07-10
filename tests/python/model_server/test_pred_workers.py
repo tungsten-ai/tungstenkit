@@ -28,7 +28,7 @@ def _watch_prediction(
     ):
         results.append(worker.get_prediction_result(prediction_id))
         last_result = results[-1]
-        if last_result.status == "success" or last_result.status == "failure":
+        if last_result.status == "success" or last_result.status == "failed":
             return results
         time.sleep(interval)
 
@@ -51,7 +51,7 @@ def _test_failure(dummy_io_generator, worker: PredictionWorker):
         prediction_id = worker.create_prediction(inputs=inputs, is_demo=False)
         worker.wait_for_prediction(prediction_id=prediction_id)
         res = worker.get_prediction_result(prediction_id=prediction_id)
-        assert res.status == "failure"
+        assert res.status == "failed"
         assert res.error_message is not None
         assert res.error_message.startswith("Traceback")
         exc = DummyModel.exception()
@@ -138,7 +138,7 @@ def _test_cancel_running_prediction(dummy_io_generator, worker: PredictionWorker
 
     res = worker.get_prediction_result(prediction_id)
 
-    assert res.status == "failure"
+    assert res.status == "failed"
     assert res.error_message
     assert res.error_message.strip().endswith("Canceled")
 
@@ -157,7 +157,7 @@ def _test_cancel_queued_prediction(dummy_io_generator, worker: PredictionWorker)
 
     res = worker.get_prediction_result(canceled_prediction_id)
 
-    assert res.status == "failure"
+    assert res.status == "failed"
     assert res.error_message
     assert res.error_message.strip().endswith("Canceled")
 

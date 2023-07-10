@@ -34,7 +34,6 @@ export const ModelRunProgress = forwardRef<HTMLDivElement, ModelRunProgressProps
 
     const cookies = new Cookies();
 
-
     const axiosInstance = getClientSideAxios();
     const predictionAPI = getPredictionAPI(axiosInstance);
 

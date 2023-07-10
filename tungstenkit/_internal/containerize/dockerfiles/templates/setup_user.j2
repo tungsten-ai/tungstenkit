@@ -24,10 +24,7 @@ RUN rm -rf /tmp/wheels
 
 {% if pip_requirements_txt_in_build_ctx != None %}
 COPY --link {{ pip_requirements_txt_in_build_ctx.as_posix() }} /tmp/requirements.txt
-COPY --link {{ tungstenkit_dir_in_build_ctx.as_posix()}} {{ tungstenkit_dir_in_container.as_posix()}}
-RUN {{ cache.mount_pip_cache() }} echo "." >> /tmp/requirements.txt && \
-    cd {{ tungstenkit_dir_in_container.as_posix()}} && \
-    pip install -r /tmp/requirements.txt && \
+RUN pip install -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 {% endif%}
 

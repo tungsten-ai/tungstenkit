@@ -152,7 +152,7 @@ class PredictionService:
     def get_prediction_by_id(self, prediction_id: str, request: Request) -> Prediction:
         with self.acquire_read_lock(prediction_id):
             last_status = self.saved_predictions[prediction_id].status
-            if last_status == "success" or last_status == "failure":
+            if last_status == "success" or last_status == "failed":
                 return self.saved_predictions[prediction_id].to_resp(
                     request=request,
                     file_service=self.file_service,
@@ -213,7 +213,7 @@ class PredictionService:
     def cancel_prediction_by_id(self, prediction_id: str):
         with self.acquire_read_lock(prediction_id):
             pred = self.saved_predictions[prediction_id]
-            if pred.status == "failure" or pred.status == "success":
+            if pred.status == "failed" or pred.status == "success":
                 return
         try:
             self.model_client.cancel_demo(prediction_id)
@@ -221,8 +221,8 @@ class PredictionService:
             _raise_http_exc_by_model_client_err(e)
 
         with self._acquire_write_lock(prediction_id):
-            if pred.status != "failure":
-                pred.status == "failure"
+            if pred.status != "failed":
+                pred.status == "failed"
                 pred.logs = pred.logs + "\nCanceled" if pred.logs else "Canceled"
 
     def start_garbage_collection(self, gc_term_event: Event) -> Thread:

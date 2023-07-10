@@ -48,8 +48,8 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 LOCK_DIR = Path(tempfile.gettempdir()) / "tungsten" / "locks"
 LOCK_DIR.mkdir(parents=True, exist_ok=True)
 
-WORKING_DIR_IN_CONTAINER = PurePosixPath("/tungsten")
 TUNGSTEN_DIR_IN_CONTAINER = PurePosixPath("/etc/tungsten")
+WORKING_DIR_IN_CONTAINER = PurePosixPath("/tungsten")
 
 MIN_SUPPORTED_PYTHON_VER = Version("3.7")
 MAX_SUPPORTED_PYTHON_VER = Version("3.11")

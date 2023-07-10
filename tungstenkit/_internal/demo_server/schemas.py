@@ -2,7 +2,8 @@ import typing as t
 from io import BytesIO
 
 from fastapi import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
+from typing_extensions import Literal
 
 from tungstenkit._internal import storables
 from tungstenkit._internal.model_server.schema import PredictionStatus
@@ -75,6 +76,13 @@ class Prediction(BaseModel):
     demo_output: t.Optional[t.Dict] = None
     logs: t.Optional[str] = None
     failure_reason: t.Optional[str] = None
+
+    # Legacy status: failure
+    @validator("status", pre=True)
+    def overwrite_status(cls, v: str):
+        if v == "failure":
+            return "failed"
+        return v
 
 
 # ==================== files ====================

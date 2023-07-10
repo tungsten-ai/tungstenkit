@@ -112,7 +112,7 @@ def _test_failure(dummy_io_generator, result_cache: AbstractResultCache):
     result_cache.set_running(input_ids=input_ids[1:])
     result_cache.set_failure(prediction_id=prediction_id, error_message="error")
     result = result_cache.get_result(prediction_id=prediction_id)
-    assert result.status == "failure"
+    assert result.status == "failed"
     assert result.error_message == "error"
     assert result.outputs is None
 

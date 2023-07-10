@@ -7,6 +7,7 @@ import jinja2
 from packaging.version import Version
 from pathspec import PathSpec
 
+import tungstenkit
 from tungstenkit._internal.configs import BuildConfig
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
 from tungstenkit._internal.utils.version import NotRequired
@@ -29,11 +30,9 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def generate(
         self,
         tmp_dir_in_build_ctx: Path,
-        tungstenkit_dir_in_build_ctx: Path,
     ):
         template_args = self.build_template_args(
             tmp_dir_in_build_ctx=tmp_dir_in_build_ctx,
-            tungstenkit_dir_in_build_ctx=tungstenkit_dir_in_build_ctx,
         )
         log_debug("Dockerfile template args:\n" + str(template_args))
         log_info("\n")
@@ -58,7 +57,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def build_template_args(
         self,
         tmp_dir_in_build_ctx: Path,
-        tungstenkit_dir_in_build_ctx: Path,
     ):
         # TODO perfer cuda version available in docker hub
         # TODO check py vers compatible with miniforge3
@@ -77,6 +75,8 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
         for requirement_str in self.config.python_packages:
             # TODO requirement_str -> requirement
             py_pkg_manager.add_requirement_str(requirement_str)
+
+        py_pkg_manager.add_requirement_str(tungstenkit.__name__ + "==" + tungstenkit.__version__)
 
         # Set user-defined CUDA & Python versions
         py_pkg_manager.set_gpu(self.config.gpu)
@@ -156,7 +156,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             tungsten_env_vars=self.config.tungsten_environment_variables,
             copy_files=self.config.copy_files,
             device="gpu" if self.config.gpu else "cpu",
-            tungstenkit_dir_in_build_ctx=tungstenkit_dir_in_build_ctx,
             large_files=large_files,
             small_files=small_files,
         )

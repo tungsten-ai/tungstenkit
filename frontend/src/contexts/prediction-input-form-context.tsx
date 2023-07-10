@@ -3,10 +3,6 @@ import { createFormContext } from "@mantine/form";
 import { getInputFieldType, InputFieldType as T } from "@/utils/prediction";
 import { isValidHttpUrl } from "@/utils/validators";
 import { InputSchema, IOFileType } from "@/types";
-import { useSessionStorage } from "@mantine/hooks";
-import { useRouter } from "next/router";
-import { useEffect } from "react";
-import { stringify, parse } from "@/utils/serialize";
 
 type InputFormFieldValue = File | string | number | boolean | null;
 
@@ -170,57 +166,6 @@ const useInputForm = ({
       );
     return onSubmitOriginal(wrapped, handleValidationFailure);
   };
-
-  // Session storage
-  const router = useRouter();
-  const [stored, store] = useSessionStorage<StoredInputFormData | null>({
-    key: `prediction-input-form`,
-    defaultValue: null,
-    serialize: stringify,
-    deserialize: (str) => (str === undefined ? null : parse(str)),
-  });
-
-  // Store data on unload/route/page leave
-  useEffect(() => {
-    const storeFormValues = () => {
-      store({
-        path: router.asPath,
-        schema,
-        filetypes,
-        values,
-      });
-    };
-    router.events?.on("routeChangeStart", storeFormValues);
-    document.documentElement.addEventListener("mouseleave", storeFormValues);
-    window?.addEventListener("beforeunload", storeFormValues);
-    return () => {
-      document.documentElement.removeEventListener("mouseleave", storeFormValues);
-      window?.removeEventListener("beforeunload", storeFormValues);
-    };
-  }, [schema, filetypes, router, store, values]);
-
-  // Load data on mount
-  useEffect(() => {
-    if (stored != null) {
-      // Cache hit
-      if (
-        stored?.values &&
-        stored?.path === router.asPath &&
-        stored?.schema != null &&
-        JSON.stringify(stored?.schema) === JSON.stringify(schema) &&
-        stored?.filetypes != null &&
-        JSON.stringify(stored?.filetypes) === JSON.stringify(filetypes)
-      ) {
-        // Cache valid -> fill the form with the stored data
-        Object.keys(stored.values).forEach((fieldName) => {
-          if (filetypes[fieldName] == null || stored.values[fieldName] != null) {
-            setFieldValue(fieldName, stored.values[fieldName]);
-            setTouched({ [fieldName]: true });
-          }
-        });
-      }
-    }
-  }, [stored, setFieldValue, schema, filetypes, router.asPath, setTouched]);
 
   return {
     onSubmit,

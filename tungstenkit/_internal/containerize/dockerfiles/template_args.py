@@ -4,7 +4,7 @@ from pathlib import Path, PurePosixPath
 import attrs
 from packaging.version import Version
 
-from tungstenkit._internal.constants import TUNGSTEN_DIR_IN_CONTAINER, WORKING_DIR_IN_CONTAINER
+from tungstenkit._internal.constants import WORKING_DIR_IN_CONTAINER
 
 from ..base_images import BaseImage
 
@@ -29,8 +29,6 @@ class TemplateArgs:
 
     # Tungsten
     tungsten_env_vars: t.Dict[str, str] = attrs.field(factory=dict)
-    tungstenkit_dir_in_build_ctx: Path
-    tungstenkit_dir_in_container: PurePosixPath = attrs.field(default=TUNGSTEN_DIR_IN_CONTAINER)
     home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
     large_files: t.List[Path] = attrs.field(factory=list)
     small_files: t.List[Path] = attrs.field(factory=list)

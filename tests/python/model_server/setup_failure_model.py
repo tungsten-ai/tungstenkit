@@ -26,4 +26,4 @@ class SetupFailureModel:
 
     @classmethod
     def exception(cls) -> t.Optional[RuntimeError]:
-        return RuntimeError("failure")
+        return RuntimeError("failed")

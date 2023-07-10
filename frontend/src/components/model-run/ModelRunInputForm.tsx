@@ -1,7 +1,6 @@
-import { isAxiosError } from "axios";
 import { Button, Group, Stack, Space } from "@mantine/core";
 import { IconPlayerPlayFilled, IconTrash } from "@tabler/icons-react";
-import { useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import {
   PredictionInputFieldsContainer,
   PredictionInputOptionCheckbox,
@@ -14,22 +13,19 @@ import {
 import { Model } from "@/types";
 import { getClientSideAxios } from "@/axios";
 import getFileAPI from "@/api/file";
-import { buildSignInPath } from "@/utils/urls";
 import { useRouter } from "next/router";
-import { Prediction, PredictionInputFieldValue } from "@/api/prediction.types";
+import { PredictionInputFieldValue } from "@/api/prediction.types";
 import { useTimeout } from "@mantine/hooks";
 import { hasInputOptions } from "@/utils/prediction";
 
 export interface ModelRunInputFormProps {
   model: Model;
-  currentPrediction: Prediction | null;
   onFormSubmit: (input: { [key: string]: PredictionInputFieldValue }) => void;
   onError: () => void;
 }
 
 export function ModelRunInputForm({
   model,
-  currentPrediction,
   onFormSubmit,
   onError,
 }: ModelRunInputFormProps) {
@@ -115,11 +111,6 @@ export function ModelRunInputForm({
 
   const { setValues: setFormValues } = form;
 
-  useLayoutEffect(() => {
-    if (currentPrediction != null) {
-      setFormValues(currentPrediction.input);
-    }
-  }, [currentPrediction, setFormValues]);
 
   return (
     <Stack w="100%" spacing="0">

@@ -30,7 +30,7 @@ class UnitResult:
     done_at: t.Optional[float] = attrs.field(default=None)
 
     def _set_running(self):
-        if self.status == "success" or self.status == "failure":
+        if self.status == "success" or self.status == "failed":
             return
 
         self.status = "running"
@@ -40,7 +40,7 @@ class UnitResult:
         output: t.Dict,
         demo_output: t.Optional[t.Dict] = None,
     ):
-        if self.status == "success" or self.status == "failure":
+        if self.status == "success" or self.status == "failed":
             return
 
         self.output = output
@@ -50,10 +50,10 @@ class UnitResult:
         self.done_event.set()
 
     def _set_error_message(self, error_message: str):
-        if self.status == "success" or self.status == "failure":
+        if self.status == "success" or self.status == "failed":
             return
 
-        self.status = "failure"
+        self.status = "failed"
         self.error_message = error_message
         self.done_at = _get_curr_time()
         self.done_event.set()
@@ -65,8 +65,8 @@ def _get_status_from_unit_results(
     running_or_success_any = False
     success_all = True
     for r in unit_results:
-        if r.status == "failure":
-            return "failure"
+        if r.status == "failed":
+            return "failed"
 
         success = r.status == "success"
         running = r.status == "running"
@@ -194,7 +194,7 @@ class LocalResultCache(AbstractResultCache):
             if any(r.log_id for r in unit_results):
                 log = self._get_log_str_from_unit_results(unit_results)
 
-        if status == "failure":
+        if status == "failed":
             error_message = _get_error_message_from_unit_results(unit_results)
             return Result(status=status, error_message=error_message, logs=log)
 
