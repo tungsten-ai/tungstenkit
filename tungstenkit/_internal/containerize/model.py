@@ -80,5 +80,5 @@ def build_model(
                         id=id,
                         source_files=build_ctx.walk_fs(),
                     )
-                model_data.save()
+                    model_data.save()
                 return storables.ModelData.load(model_name)
