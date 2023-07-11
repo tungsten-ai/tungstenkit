@@ -9,7 +9,11 @@ from fastapi.encoders import jsonable_encoder
 from tabulate import tabulate
 
 from tungstenkit._internal import model_store
-from tungstenkit._internal.constants import DEFAULT_MODEL_MODULE, TUNGSTEN_LOGO
+from tungstenkit._internal.constants import (
+    DEFAULT_MODEL_MODULE,
+    TUNGSTEN_DIR_IN_CONTAINER,
+    TUNGSTEN_LOGO,
+)
 from tungstenkit._internal.containerize import build_model
 from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel

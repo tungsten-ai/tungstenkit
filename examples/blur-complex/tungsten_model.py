@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from PIL import ImageFilter
 
@@ -14,7 +14,11 @@ class Input(BaseIO):
     )
     delay: int = Option(1, description="Delay in seconds", ge=1, le=60.0)
     failure: bool = Option(False)
-    empty: str = Option("")
+    # empty: str = Option("")
+    # nullable: Optional[str] = Option(None)
+    # nullable2: str | None = Option(None)
+    # optional_image: Optional[Image] = Option(None)
+    # optinaal_image2: Image | None = Option(None)
 
 
 class Output(BaseIO):

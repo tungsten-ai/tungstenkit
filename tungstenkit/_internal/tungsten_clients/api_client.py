@@ -79,18 +79,20 @@ class TungstenAPIClient:
         return schemas.Project.parse_raw(resp.text)
 
     def fetch_project_avatar(
-        self, project_full_slug: str, avatar_url: str
+        self, project_full_slug: str, avatar_url: t.Optional[str] = None
     ) -> storables.AvatarData:
-        log_request(url=avatar_url, method="GET")
-        resp = self.sess.get(avatar_url, timeout=CONNECTION_TINEOUT)
-        if resp.status_code == 404:
+        resp = None
+        if avatar_url:
+            log_request(url=avatar_url, method="GET")
+            resp = self.sess.get(avatar_url, timeout=CONNECTION_TINEOUT)
+        if resp is None or resp.status_code == 404:
             return storables.AvatarData.fetch_default(
                 project_full_slug + " avatar", avatar_domain=self.base_url
             )
-
-        _check_resp(
-            resp, avatar_url, f"Failed to fetch the avatar of project '{project_full_slug}'"
-        )
+        if avatar_url:
+            _check_resp(
+                resp, avatar_url, f"Failed to fetch the avatar of project '{project_full_slug}'"
+            )
         return storables.AvatarData(bytes_=resp.content, extension=".png")
 
     def get_model(self, project_full_slug: str, version: str) -> schemas.Model:

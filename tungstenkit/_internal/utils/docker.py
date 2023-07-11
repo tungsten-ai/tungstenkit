@@ -382,6 +382,10 @@ def start_server_container(
             else:
                 raise e
 
+        except BaseException:
+            if "container" in locals():
+                container.remove(force=True)
+
     def handle_signal(*args, **argv):
         if termination_event.is_set():
             raise DockerError(
