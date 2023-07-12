@@ -158,6 +158,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             device="gpu" if self.config.gpu else "cpu",
             large_files=large_files,
             small_files=small_files,
+            gpu_mem_gb=self.config.gpu_mem_gb,
         )
 
         return template_args
