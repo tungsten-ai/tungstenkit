@@ -6,9 +6,9 @@ import attrs
 import pytest
 
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
-from tungstenkit._internal.json_store import JSONCollection, JSONItem, JSONStorable
+from tungstenkit._internal.json_store import JSONItem, JSONStorable, JSONStore
 
-hashes: t.Set[str] = set()
+names: t.Set[str] = set()
 
 
 @attrs.define
@@ -16,19 +16,14 @@ class Item(JSONItem):
     id: str
     repo_name: str
     tag: str
-    hash: str
     blob: Blob
 
     @property
     def blobs(self) -> t.Set[Blob]:
         return {self.blob}
 
-    @property
-    def name(self) -> str:
-        return self.repo_name + ":" + self.tag
-
     def cleanup(self):
-        hashes.remove(self.hash)
+        names.remove(self.name)
 
     @staticmethod
     def parse_name(name: str) -> t.Tuple[str, str]:
@@ -48,14 +43,13 @@ class Storable(JSONStorable[Item]):
     id: str
     repo_name: str
     tag: str
-    hash: str
     file: Path
 
     def save_blobs(
         self, blob_store: BlobStore, file_blob_create_policy: FileBlobCreatePolicy = "copy"
     ) -> Item:
         blob = blob_store.add_by_writing(self.file)
-        return Item(id=self.id, repo_name=self.repo_name, tag=self.tag, hash=self.hash, blob=blob)
+        return Item(id=self.id, repo_name=self.repo_name, tag=self.tag, blob=blob)
 
     @classmethod
     def load_blobs(cls, data: Item):
@@ -65,12 +59,12 @@ class Storable(JSONStorable[Item]):
 
 @pytest.fixture
 def json_store():
-    json_store = JSONCollection[Item](Item)
+    json_store = JSONStore[Item](Item)
     yield json_store
     json_store.clear_repo(None)
 
 
-def test_json_store(json_store: JSONCollection[Item], tmp_path: Path):
+def test_json_store(json_store: JSONStore[Item], tmp_path: Path):
     file1 = tmp_path / "filer1"
     file1.touch()
     file2 = tmp_path / "file2"
@@ -78,8 +72,8 @@ def test_json_store(json_store: JSONCollection[Item], tmp_path: Path):
     item1 = Storable(id=uuid4().hex, repo_name="repo1", tag="tag1", hash="hash1", file=file1)
     item2 = Storable(id=uuid4().hex, repo_name="repo1", tag="tag2", hash="hash1", file=file1)
     item3 = Storable(id=uuid4().hex, repo_name="repo2", tag="tag3", hash="hash2", file=file2)
-    hashes.add("hash1")
-    hashes.add("hash2")
+    names.add("hash1")
+    names.add("hash2")
 
     blob_store = BlobStore()
     saved = item1.save_blobs(blob_store)
@@ -104,7 +98,7 @@ def test_json_store(json_store: JSONCollection[Item], tmp_path: Path):
     assert len(json_store.list()) == 2
 
     json_store.clear_repo("repo1")
-    assert item1.hash not in hashes
+    assert item1.hash not in names
     assert len(json_store.list()) == 1
 
     json_store.clear_repo(None)

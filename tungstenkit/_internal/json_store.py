@@ -12,6 +12,7 @@ from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
 from tungstenkit._internal.logging import log_debug
+from tungstenkit._internal.utils.docker import parse_docker_image_name
 from tungstenkit._internal.utils.file import write_safely
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 from tungstenkit._internal.utils.string import camel_to_snake
@@ -21,9 +22,11 @@ StorableType = t.TypeVar("StorableType", bound="JSONStorable")
 ItemType = t.TypeVar("ItemType", bound="JSONItem")
 CollectionType = t.TypeVar("CollectionType", bound="_JSONCollection")
 
+DEFAULT_TAG = "latest"
+
 
 class JSONStorable(BlobStorable[ItemType]):
-    _store: "JSONCollection[ItemType]"
+    _store: "JSONStore[ItemType]"
 
     def save(self, file_blob_create_policy: FileBlobCreatePolicy = "copy") -> ItemType:
         blob_store = BlobStore()
@@ -42,14 +45,18 @@ class JSONStorable(BlobStorable[ItemType]):
     def generate_id() -> str:
         return uuid4().hex
 
+    @staticmethod
+    def parse_name(name: str) -> t.Tuple[str, t.Optional[str]]:
+        return parse_docker_image_name(name)
+
     @classmethod
-    def _get_store(cls: t.Type[StorableType]) -> "JSONCollection[ItemType]":
+    def _get_store(cls: t.Type[StorableType]) -> "JSONStore[ItemType]":
         if not hasattr(cls, "_store"):
             args = get_superclass_type_args(cls, JSONStorable)
             if len(args) == 0:
                 raise RuntimeError("Type argument is not set")
             data_cls: t.Type[ItemType] = args[0]
-            cls._store = JSONCollection[data_cls](data_cls)  # type: ignore
+            cls._store = JSONStore[data_cls](data_cls)  # type: ignore
         return cls._store
 
 
@@ -57,11 +64,6 @@ class JSONItem(abc.ABC):
     @property
     @abc.abstractmethod
     def id(self) -> str:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def hash(self) -> str:
         pass
 
     @property
@@ -75,13 +77,13 @@ class JSONItem(abc.ABC):
         pass
 
     @property
+    def name(self) -> str:
+        return self.repo_name + ":" + self.tag
+
+    @property
     @abc.abstractmethod
     def blobs(self) -> t.Set[Blob]:
         pass
-
-    @property
-    def name(self) -> str:
-        return self.repo_name + ":" + self.tag
 
     @property
     @abc.abstractmethod
@@ -92,18 +94,13 @@ class JSONItem(abc.ABC):
     def cleanup(self):
         pass
 
-    @staticmethod
-    @abc.abstractmethod
-    def parse_name(name: str) -> t.Tuple[str, str]:
-        pass
-
     @classmethod
     def get_typename(cls) -> str:
         return camel_to_snake(cls.__name__)
 
 
 # TODO encapsulate JSONCollection
-class JSONCollection(t.Generic[ItemType]):
+class JSONStore(t.Generic[ItemType]):
     _item_type: t.Type[ItemType]
     _collection_type: "t.Type[_JSONCollection[ItemType]]"
 
@@ -130,40 +127,60 @@ class JSONCollection(t.Generic[ItemType]):
         """Add to the colleciton and prune dangling items"""
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
-            col.add(item)
+            col.add_item(item)
             self._gc(col)
             col.save(self.collection_path)
 
-    # def get_latest_tag(self, repo: str):
+    def tag(self, src_name: str, dest_name: str) -> str:
+        src_repo, _src_tag = JSONStorable.parse_name(src_name)
+        src_tag = _src_tag if _src_tag else DEFAULT_TAG
 
-    def tag(self, src_name: str, dest_name: str):
-        src_repo, src_tag = self._item_type.parse_name(src_name)
-        dest_repo, dest_tag = self._item_type.parse_name(dest_name)
+        dest_repo, _dest_tag = JSONStorable.parse_name(dest_name)
+        dest_tag = _dest_tag if _dest_tag else src_tag
+
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
-            src = col.get_by_tag(src_repo, src_tag)
+            src = col.get_item_by_tag(src_repo, src_tag)
             if src is None:
-                self._raise_not_found_by_name(src_name)
-            col.tag(dest_repo, dest_tag, src.id)  # type: ignore
+                raise exceptions.NotFound(self._build_not_found_err_msg(src_name))
+            col.tag_item(dest_repo, dest_tag, src.id)
             col.save(self.collection_path)
+
+        return dest_repo + ":" + dest_tag
 
     def update(self, item: ItemType) -> None:
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
-            orig = col.get_by_id(item.id)
+            orig = col.get_item_by_id(item.id)
             if orig is None:
-                self._raise_not_found_by_id(item.id)
-            col.update(item)
+                raise exceptions.NotFound(self._build_not_found_err_msg(item.name))
+            col.update_item(item)
             col.save(self.collection_path)
 
     def get(self, name: str) -> ItemType:
-        repo, tag = self._item_type.parse_name(name)
+        repo, _tag = JSONStorable.parse_name(name)
+
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
 
-        item = col.get_by_tag(repo, tag)
+        if not col.check_repo_exsistence(repo):
+            raise exceptions.NotFound(self._build_not_found_err_msg(name))
+
+        if _tag is None:
+            if col.check_tag_exsistence_in_repo(repo, DEFAULT_TAG):
+                tag = DEFAULT_TAG
+            else:
+                _tag = col.get_latest_tag_in_repo(repo_name=name)
+                if _tag is None:
+                    raise exceptions.NotFound(self._build_not_found_err_msg(name))
+                else:
+                    tag = _tag
+        else:
+            tag = _tag
+
+        item = col.get_item_by_tag(repo, tag)
         if item is None:
-            self._raise_not_found_by_name(repo + ":" + tag)
+            self._build_not_found_err_msg(name)
         attrs_kwargs = {k: v for k, v in attrs.asdict(item, recurse=False).items() if k != "tag"}
         return self._item_type(tag=tag, **attrs_kwargs)  # type: ignore
 
@@ -173,7 +190,7 @@ class JSONCollection(t.Generic[ItemType]):
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
 
-        items = col.list()
+        items = col.list_items()
         for _, tag, item in items:
             attrs_kwargs = {
                 k: v for k, v in attrs.asdict(item, recurse=False).items() if k != "tag"
@@ -183,12 +200,13 @@ class JSONCollection(t.Generic[ItemType]):
         return ret
 
     def delete(self, name: str):
-        repo, tag = self._item_type.parse_name(name)
+        repo, _tag = JSONStorable.parse_name(name)
+        tag = _tag if _tag else DEFAULT_TAG
 
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
             if tag not in col.repositories[repo]:
-                self._raise_not_found_by_name(name)
+                raise exceptions.NotFound(self._build_not_found_err_msg(name))
 
             del col.repositories[repo][tag]
             if len(col.repositories[repo]) == 0:
@@ -216,8 +234,7 @@ class JSONCollection(t.Generic[ItemType]):
             return
 
         for _, item in removed_id_and_data:
-            if not col.check_hash_exsistence(item.hash):
-                item.cleanup()
+            item.cleanup()
 
     def _delete_unused_blobs(self):
         self._blob_store.delete_unused(self._collect_blobs())
@@ -228,11 +245,8 @@ class JSONCollection(t.Generic[ItemType]):
             blobs = blobs.union(m.blobs)
         return blobs
 
-    def _raise_not_found_by_name(self, name: str):
-        raise exceptions.NotFound(f"{self._item_type.get_typename()} '{name}'")
-
-    def _raise_not_found_by_id(self, id: str):
-        raise exceptions.NotFound(f"{self._item_type.get_typename()} id '{id}'")
+    def _build_not_found_err_msg(self, name: str):
+        return f"{self._item_type.get_typename()} '{name}'"
 
 
 @attrs.frozen
@@ -240,38 +254,47 @@ class _JSONCollection(t.Generic[ItemType]):
     repositories: t.Dict[str, t.Dict[str, str]] = attrs.field(factory=dict)
     items: t.Dict[str, ItemType] = attrs.field(factory=dict)
 
-    def tag(self, repo_name: str, tag: str, id: str):
+    def tag_item(self, repo_name: str, tag: str, id: str):
         if repo_name not in self.repositories.keys():
             self.repositories[repo_name] = dict()
         self.repositories[repo_name][tag] = id
         return id
 
-    def add(
+    def add_item(
         self,
         item: ItemType,
     ):
         if item.repo_name not in self.repositories.keys():
             self.repositories[item.repo_name] = dict()
         self.items[item.id] = item
-        self.tag(item.repo_name, item.tag, item.id)
+        self.tag_item(item.repo_name, item.tag, item.id)
 
-    def update(self, item: ItemType):
+    def update_item(self, item: ItemType):
         orig = self.items[item.id]
         assert orig.id == item.id
         self.items[item.id] = item
 
-    def get_by_tag(self, repo_name: str, tag: str) -> t.Optional[ItemType]:
+    def get_item_by_tag(self, repo_name: str, tag: str) -> t.Optional[ItemType]:
         if repo_name not in self.repositories or tag not in self.repositories[repo_name]:
             return None
         item = self.items[self.repositories[repo_name][tag]]
         return item
 
-    def get_by_id(self, id: str) -> t.Optional[ItemType]:
+    def get_item_by_id(self, id: str) -> t.Optional[ItemType]:
         if id not in self.items:
             return None
         return self.items[id]
 
-    def list(self) -> t.List[t.Tuple[str, str, ItemType]]:
+    def get_latest_tag_in_repo(self, repo_name: str) -> t.Optional[str]:
+        if len(self.repositories[repo_name]) == 0:
+            return None
+        return sorted(
+            self.repositories[repo_name].keys(),
+            key=lambda key: self.items[self.repositories[repo_name][key]].created_at,
+            reverse=True,
+        )[0]
+
+    def list_items(self) -> t.List[t.Tuple[str, str, ItemType]]:
         ret: t.List[t.Tuple[str, str, ItemType]] = []
         for repo_name in self.repositories.keys():
             for tag, id in self.repositories[repo_name].items():
@@ -279,7 +302,7 @@ class _JSONCollection(t.Generic[ItemType]):
                 ret.append((repo_name, tag, item))
         return sorted(ret, key=lambda val: (val[0], datetime.utcnow() - val[2].created_at))
 
-    def list_in_repo(self, repo_name: str) -> t.List[t.Tuple[str, ItemType]]:
+    def list_items_in_repo(self, repo_name: str) -> t.List[t.Tuple[str, ItemType]]:
         ret: t.List[t.Tuple[str, ItemType]] = []
         for tag, id in self.repositories[repo_name].items():
             item = self.items[id]
@@ -303,23 +326,16 @@ class _JSONCollection(t.Generic[ItemType]):
 
         return deleted
 
+    def check_tag_exsistence_in_repo(self, repo_name: str, tag: str) -> bool:
+        return repo_name in self.repositories and tag in self.repositories[repo_name]
+
+    def check_repo_exsistence(self, repo_name: str) -> bool:
+        return repo_name in self.repositories
+
     def check_item_exsistence(self, id: str) -> bool:
-        for repo_name in self.repositories.keys():
-            if id in self.repositories[repo_name].values():
-                return True
-        return False
-
-    def check_hash_exsistence(self, hash_val: str) -> bool:
-        for repo_name in self.repositories.keys():
-            for id in self.repositories[repo_name].values():
-                data = self.items[id]
-                if data.hash == hash_val:
-                    return True
-        return False
-
-    def cleanup(self, removed: ItemType):
-        if not self.check_hash_exsistence(removed.hash):
-            removed.cleanup()
+        return any(
+            id in self.repositories[repo_name].values() for repo_name in self.repositories.keys()
+        )
 
     def save(self, path: Path):
         log_debug(f"Save JSON collection to '{path}'")

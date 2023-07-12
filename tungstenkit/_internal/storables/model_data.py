@@ -3,9 +3,15 @@ from datetime import datetime
 
 import attrs
 
+from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
+from tungstenkit._internal.constants import DEFAULT_GPU_MEM_GB
 from tungstenkit._internal.json_store import JSONItem, JSONStorable
-from tungstenkit._internal.utils.docker import get_docker_client, parse_docker_image_name
+from tungstenkit._internal.utils.docker import (
+    get_docker_client,
+    parse_docker_image_name,
+    remove_docker_image,
+)
 from tungstenkit._internal.utils.serialize import load_attrs_from_json
 
 from .avatar_data import AvatarData, StoredAvatar
@@ -63,6 +69,8 @@ class _ModelDataInImage:
                     device = label_value
                 elif label_name == "gpu_mem_gb":
                     gpu_mem_gb = int(label_value)
+                    if device == "gpu" and gpu_mem_gb == 0:
+                        gpu_mem_gb = DEFAULT_GPU_MEM_GB
 
         return _ModelDataInImage(
             module_name=module_name,
@@ -75,7 +83,7 @@ class _ModelDataInImage:
 
 
 @attrs.frozen(kw_only=True)
-class StoredModelData(_ModelDataInImage, JSONItem):
+class StoredModelData(JSONItem):
     id: str
     repo_name: str
     tag: str
@@ -86,10 +94,6 @@ class StoredModelData(_ModelDataInImage, JSONItem):
     source_files: t.Optional[SerializedSourceFileCollection] = None
 
     created_at: datetime = attrs.field(factory=datetime.utcnow)
-
-    @property
-    def hash(self) -> str:
-        return self.docker_image_id
 
     @property
     def blobs(self) -> t.Set[Blob]:
@@ -115,8 +119,7 @@ class StoredModelData(_ModelDataInImage, JSONItem):
         return blob_set
 
     def cleanup(self):
-        docker_client = get_docker_client(timeout=None)
-        docker_client.images.remove(image=self.docker_image_id, force=True)
+        remove_docker_image(self.name)
 
     @staticmethod
     def parse_name(name: str) -> t.Tuple[str, str]:
@@ -214,16 +217,10 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             id=self.id,
             repo_name=self.repo_name,
             tag=self.tag,
-            readme=stored_readme,
             io=stored_schema,
             avatar=stored_avatar,
+            readme=stored_readme,
             source_files=stored_source_files,
-            module_name=self.module_name,
-            class_name=self.class_name,
-            docker_image_id=self.docker_image_id,
-            batch_size=self.batch_size,
-            device=self.device,
-            gpu_mem_gb=self.gpu_mem_gb,
             **extra_kwargs,
         )
 
