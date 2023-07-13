@@ -544,7 +544,7 @@ class Installer:
         Installs Tungstenkit in $TUNGSTEN_HOME.
         """
         self._write(
-            "Installing {} ({})".format(colorize("info", "Tungstenkit"), colorize("info", version))
+            "Installing {} ({})".format(colorize("info", "tungstenkit"), colorize("info", version))
         )
 
         with self.make_env(version) as env:
@@ -557,7 +557,7 @@ class Installer:
 
     def uninstall(self) -> int:
         if not self.data_dir.exists():
-            self._write("{} is not currently installed.".format(colorize("info", "Tungstenkit")))
+            self._write("{} is not currently installed.".format(colorize("info", "tungstenkit")))
 
             return 1
 
@@ -567,10 +567,10 @@ class Installer:
 
         if version:
             self._write(
-                "Removing {} ({})".format(colorize("info", "Tungstenkit"), colorize("b", version))
+                "Removing {} ({})".format(colorize("info", "tungstenkit"), colorize("b", version))
             )
         else:
-            self._write("Removing {}".format(colorize("info", "Tungstenkit")))
+            self._write("Removing {}".format(colorize("info", "tungstenkit")))
 
         shutil.rmtree(str(self.data_dir))
         for script in ["tungsten", "tungsten.bat", "tungsten.exe"]:
@@ -582,7 +582,7 @@ class Installer:
     def _install_comment(self, version: str, message: str):
         self._overwrite(
             "Installing {} ({}): {}".format(
-                colorize("info", "Tungstenkit"),
+                colorize("info", "tungstenkit"),
                 colorize("b", version),
                 colorize("comment", message),
             )
@@ -634,7 +634,7 @@ class Installer:
             shutil.copy(target_script, self.bin_dir.joinpath(script))
 
     def install_tungstenkit(self, version: str, env: VirtualEnvironment) -> None:
-        self._install_comment(version, "Installing Tungstenkit")
+        self._install_comment(version, "Installing tungstenkit")
 
         if self._git:
             specification = "git+" + version
