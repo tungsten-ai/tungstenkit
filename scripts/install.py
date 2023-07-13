@@ -671,7 +671,7 @@ class Installer:
 
         self._write(
             message.format(
-                tungsten=colorize("info", "Tungstenkit"),
+                tungstenkit=colorize("info", "tungstenkit"),
                 version=colorize("b", version),
                 tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
@@ -703,7 +703,7 @@ class Installer:
 
         self._write(
             message.format(
-                tungsten=colorize("info", "Tungstenkit"),
+                tungstenkit=colorize("info", "tungstenkit"),
                 version=colorize("b", version),
                 tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
@@ -723,7 +723,7 @@ class Installer:
 
         self._write(
             message.format(
-                tungsten=colorize("info", "Tungstenkit"),
+                tungstenkit=colorize("info", "tungstenkit"),
                 version=colorize("b", version),
                 tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
