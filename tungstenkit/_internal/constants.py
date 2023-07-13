@@ -3,10 +3,10 @@ import re
 import tempfile
 from pathlib import Path, PurePosixPath
 
-from appdirs import AppDirs
 from packaging.version import Version
+from platformdirs import user_config_path, user_data_path
 
-appdirs = AppDirs(appname="tungstenkit", appauthor="tungsten")
+import tungstenkit
 
 
 def default_model_repo() -> str:
@@ -35,13 +35,23 @@ TUNGSTEN_LOGO = r"""
 """
 
 DEFAULT_MODEL_MODULE = "tungsten_model"
-DEFAULT_TUNGSTEN_SERVER_URL = "https://api.tungsten-ai.com"
+DEFAULT_TUNGSTEN_SERVER_URL = "https://api.tungsten.run"
+DEFAULT_GPU_MEM_GB = 16
 
-DATA_DIR = Path(os.getenv("TUNGSTEN_DATA_DIR", Path(appdirs.user_data_dir)))
+DATA_DIR = Path(
+    os.getenv(
+        "TUNGSTEN_HOME", Path(user_data_path(tungstenkit.__name__, appauthor=False, roaming=True))
+    )
+)
 DATA_DIR = DATA_DIR.resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-CONFIG_DIR = Path(os.getenv("TUNGSTEN_CONFIG_DIR", Path(appdirs.user_config_dir)))
+CONFIG_DIR = Path(
+    os.getenv(
+        "TUNGSTEN_CONFIG_DIR",
+        Path(user_config_path(tungstenkit.__name__, appauthor=False, roaming=True)),
+    )
+)
 CONFIG_DIR = CONFIG_DIR.resolve()
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -54,4 +64,3 @@ WORKING_DIR_IN_CONTAINER = PurePosixPath("/tungsten")
 MIN_SUPPORTED_PYTHON_VER = Version("3.7")
 MAX_SUPPORTED_PYTHON_VER = Version("3.11")
 MAX_SOURCE_FILE_SIZE = 10 * 1024 * 1024
-DEFAULT_GPU_MEM_GB = 16
