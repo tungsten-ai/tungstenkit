@@ -233,30 +233,30 @@ if WINDOWS:
 
 PRE_MESSAGE = """# Welcome to {tungsten}!
 
-This will download and install the latest version of {tungsten},
+This will download and install the latest version of {tungstenkit},
 a dependency and package manager for Python.
 
-It will add the `tungsten` command to {tungsten}'s bin directory, located at:
+It will add the `tungsten` command to {tungstenkit}'s bin directory, located at:
 
-{tungsten_home_bin}
+{tungstenkit_home_bin}
 
 You can uninstall at any time by executing this script with the --uninstall option,
 and these changes will be reverted.
 """
 
-POST_MESSAGE = """{tungsten} ({version}) is installed now.
+POST_MESSAGE = """{tungstenkit} ({version}) is installed now.
 
 You can test that everything is set up by executing:
 
 `{test_command}`
 """
 
-POST_MESSAGE_NOT_IN_PATH = """{tungsten} ({version}) is installed now. Great!
+POST_MESSAGE_NOT_IN_PATH = """{tungstenkit} ({version}) is installed now. Great!
 
-To get started you need {tungsten}'s bin directory ({tungsten_home_bin}) in your `PATH`
+To get started you need {tungstenkit}'s bin directory ({tungstenkit_home_bin}) in your `PATH`
 environment variable.
 {configure_message}
-Alternatively, you can call {tungsten} explicitly with `{tungsten_executable}`.
+Alternatively, you can call {tungstenkit} explicitly with `{tungsten_executable}`.
 
 You can test that everything is set up by executing:
 
@@ -264,11 +264,11 @@ You can test that everything is set up by executing:
 """
 
 POST_MESSAGE_CONFIGURE_UNIX = """
-Add `export PATH="{tungsten_home_bin}:$PATH"` to your shell configuration file.
+Add `export PATH="{tungstenkit_home_bin}:$PATH"` to your shell configuration file.
 """
 
 POST_MESSAGE_CONFIGURE_FISH = """
-You can execute `set -U fish_user_paths {tungsten_home_bin} $fish_user_paths`
+You can execute `set -U fish_user_paths {tungstenkit_home_bin} $fish_user_paths`
 """
 
 POST_MESSAGE_CONFIGURE_WINDOWS = """"""
@@ -647,8 +647,9 @@ class Installer:
 
     def display_pre_message(self) -> None:
         kwargs = {
-            "tungsten": colorize("info", "Tungstenkit"),
-            "tungsten_home_bin": colorize("comment", self.bin_dir),
+            "tungsten": colorize("info", "Tungsten"),
+            "tungstenkit": colorize("info", "tungstenkit"),
+            "tungstenkit_home_bin": colorize("comment", self.bin_dir),
         }
         self._write(PRE_MESSAGE.format(**kwargs))
 
@@ -672,10 +673,10 @@ class Installer:
             message.format(
                 tungsten=colorize("info", "Tungstenkit"),
                 version=colorize("b", version),
-                tungsten_home_bin=colorize("comment", self.bin_dir),
+                tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
                 configure_message=POST_MESSAGE_CONFIGURE_WINDOWS.format(
-                    tungsten_home_bin=colorize("comment", self.bin_dir)
+                    tungstenkit_home_bin=colorize("comment", self.bin_dir)
                 ),
                 test_command=colorize("b", "tungstenkit --version"),
             )
@@ -704,10 +705,10 @@ class Installer:
             message.format(
                 tungsten=colorize("info", "Tungstenkit"),
                 version=colorize("b", version),
-                tungsten_home_bin=colorize("comment", self.bin_dir),
+                tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
                 configure_message=POST_MESSAGE_CONFIGURE_FISH.format(
-                    tungsten_home_bin=colorize("comment", self.bin_dir)
+                    tungstenkit_home_bin=colorize("comment", self.bin_dir)
                 ),
                 test_command=colorize("b", "tungsten --version"),
             )
@@ -724,10 +725,10 @@ class Installer:
             message.format(
                 tungsten=colorize("info", "Tungstenkit"),
                 version=colorize("b", version),
-                tungsten_home_bin=colorize("comment", self.bin_dir),
+                tungstenkit_home_bin=colorize("comment", self.bin_dir),
                 tungsten_executable=colorize("b", self.bin_dir.joinpath("tungsten")),
                 configure_message=POST_MESSAGE_CONFIGURE_UNIX.format(
-                    tungsten_home_bin=colorize("comment", self.bin_dir)
+                    tungstenkit_home_bin=colorize("comment", self.bin_dir)
                 ),
                 test_command=colorize("b", "tungsten --version"),
             )
