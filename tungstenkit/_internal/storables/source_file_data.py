@@ -121,7 +121,11 @@ class SourceFileCollection(BlobStorable[SerializedSourceFileCollection]):
 
     @classmethod
     def load_blobs(cls, data: SerializedSourceFileCollection) -> "SourceFileCollection":
-        stored_col = load_attrs_from_json(StoredSourceFileCollection, data.blob.file_path)
+        try:
+            stored_col = load_attrs_from_json(StoredSourceFileCollection, data.blob.file_path)
+        except Exception as e:
+            print(data.blob.file_path)
+            raise e
         col = cls()
         for stored_src_file in stored_col.files:
             abs_path_in_host_fs = (

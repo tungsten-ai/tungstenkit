@@ -31,7 +31,7 @@ class AvatarData(BlobStorable[StoredAvatar]):
         file_blob_create_policy: FileBlobCreatePolicy = "copy",
     ) -> StoredAvatar:
         filename = "avatar" + self.extension
-        blob = blob_store.add_by_writing((self.bytes_, "avatar" + filename))
+        blob = blob_store.add_by_writing((self.bytes_, filename))
         return StoredAvatar(blob=blob)
 
     @classmethod

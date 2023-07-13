@@ -18,13 +18,20 @@ from tungstenkit._internal.utils.file import list_dirs, list_files
 BlobStorableType = t.TypeVar("BlobStorableType", bound="BlobStorable")
 BlobContainerType = t.TypeVar("BlobContainerType")
 FileBlobCreatePolicy: TypeAlias = Literal["copy", "rename"]
+
+BLOBS_DATA_DIR = DATA_DIR / "blobs" / "data"
+BLOBS_LOCK_PATH = LOCK_DIR / "blobs.lock"
 BUF_SIZE_FOR_HASHING = 1048576  # 1MB
 
 
 @attrs.frozen(kw_only=True, order=True)
 class Blob:
     digest: str
-    file_path: Path = attrs.field(eq=False, order=False)
+    file_name: str
+
+    @property
+    def file_path(self):
+        return _build_blob_dir_path(self.digest) / self.file_name
 
     def remove(self):
         shutil.rmtree(self.file_path.parent)
@@ -44,28 +51,22 @@ class BlobStorable(abc.ABC, t.Generic[BlobContainerType]):
 
 
 class BlobStore:
-    _base_dir: t.ClassVar[Path] = DATA_DIR / "blobs"
-    _lock_path: t.ClassVar[Path] = LOCK_DIR / "blobs.lock"
-
-    __data_dir: Path
-
     def __init__(self) -> None:
-        self.__data_dir = self._base_dir / "data"
-        self.__data_dir.mkdir(parents=True, exist_ok=True)
-        self._lock = InterProcessReaderWriterLock(path=self._lock_path)
+        BLOBS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self._lock = InterProcessReaderWriterLock(path=BLOBS_LOCK_PATH)
 
     def list_digests(self) -> t.List[str]:
-        return [d.name for base_dir in list_dirs(self.__data_dir) for d in list_dirs(base_dir)]
+        return [d.name for base_dir in list_dirs(BLOBS_DATA_DIR) for d in list_dirs(base_dir)]
 
     def get_by_digest(self, digest: str) -> Blob:
-        blob_dir = self._build_blob_dir_path(digest)
+        blob_dir = _build_blob_dir_path(digest)
         if not blob_dir.exists():
             raise KeyError(f"Blob not found: {digest}")
 
-        return Blob(digest=digest, file_path=list_files(blob_dir)[0])
+        return Blob(digest=digest, file_name=list_files(blob_dir)[0].name)
 
     def check_if_contained(self, digest: str) -> bool:
-        return self._build_blob_dir_path(digest).exists()
+        return _build_blob_dir_path(digest).exists()
 
     def add_multiple_by_writing(self, *args: t.Union[Path, t.Tuple[bytes, str]]) -> t.List[Blob]:
         """
@@ -107,7 +108,7 @@ class BlobStore:
 
                 list_blob_dir, list_file_name, list_path_or_bytes = [], [], []
                 for digest, (file_name, path_or_bytes) in to_be_added.items():
-                    list_blob_dir.append(self._build_blob_dir_path(digest))
+                    list_blob_dir.append(_build_blob_dir_path(digest))
                     list_file_name.append(file_name)
                     list_path_or_bytes.append(path_or_bytes)
                 for _ in executor.map(
@@ -116,7 +117,7 @@ class BlobStore:
                     pass
         except BaseException as e:
             for digest in to_be_added.keys():
-                d = self._build_blob_dir_path(digest)
+                d = _build_blob_dir_path(digest)
                 if d.exists():
                     shutil.rmtree(d)
 
@@ -134,10 +135,10 @@ class BlobStore:
         digest = _hash_file(path)
         if self.check_if_contained(digest):
             return self.get_by_digest(digest)
-        blob_dir = self._build_blob_dir_path(digest)
+        blob_dir = _build_blob_dir_path(digest)
         blob_dir.mkdir(parents=True)
         os.replace(path.resolve(), blob_dir / path.name)
-        return Blob(digest=digest, file_path=path)
+        return Blob(digest=digest, file_name=path.name)
 
     def delete_unused(self, used: t.Set[Blob]) -> None:
         with self._lock.write_lock():
@@ -164,7 +165,7 @@ class BlobStore:
             self._lock.release_read_lock()
 
     def _build_blob_dir_path(self, digest: str) -> Path:
-        return self.__data_dir / digest[:2] / digest
+        return BLOBS_DATA_DIR / digest[:2] / digest
 
     def _sanitize(self) -> None:
         """
@@ -173,7 +174,7 @@ class BlobStore:
         digests = self.list_digests()
         to_be_removed = []
         for digest in digests:
-            directory = self._build_blob_dir_path(digest)
+            directory = _build_blob_dir_path(digest)
             if len(list_files(directory)) == 0:
                 to_be_removed.append(str(directory))
         if to_be_removed:
@@ -213,3 +214,7 @@ def _write_blob(blob_dir: Path, file_name: str, path_or_bytes: t.Union[Path, byt
     except BaseException as e:
         shutil.rmtree(str(blob_dir))
         raise e
+
+
+def _build_blob_dir_path(digest: str) -> Path:
+    return BLOBS_DATA_DIR / digest[:2] / digest

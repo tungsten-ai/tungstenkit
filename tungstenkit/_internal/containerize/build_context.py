@@ -13,7 +13,6 @@ from filelock import FileLock
 from pathspec import PathSpec
 from rich.progress import Progress, TextColumn
 
-import tungstenkit
 from tungstenkit import exceptions
 from tungstenkit._internal import storables
 from tungstenkit._internal.configs import BuildConfig
