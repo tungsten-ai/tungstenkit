@@ -13,13 +13,13 @@ from typing import Dict, List, Optional, Set
 Import = namedtuple("Import", ["module", "name", "alias"])
 
 
-def _raise_module_not_found(exc_msg):
-    exc = ModuleNotFoundError(exc_msg)
+def _raise_module_cannot_be_loaded(exc_msg):
+    exc = ImportError(exc_msg)
     try:
         raise exc
 
     # Re-raise after manipulating traceback
-    except ModuleNotFoundError:
+    except ImportError:
         tb = sys.exc_info()[2]
         back_frame = tb.tb_frame.f_back.f_back
 
@@ -47,10 +47,10 @@ class UnknownModuleObject(object):
 
     # TODO set this for all magic methods
     def __call__(self, *args, **kwds):
-        _raise_module_not_found(self.__exc_msg)
+        _raise_module_cannot_be_loaded(self.__exc_msg)
 
     def __getattr__(self, name):
-        _raise_module_not_found(self.__exc_msg)
+        _raise_module_cannot_be_loaded(self.__exc_msg)
 
 
 class UnknownModule(ModuleType):
@@ -69,13 +69,13 @@ class UnknownModule(ModuleType):
             return UnknownModuleObject(
                 exc_msg=self._build_exc_msg(),
             )
-        _raise_module_not_found(self._build_exc_msg())
+        _raise_module_cannot_be_loaded(self._build_exc_msg())
 
     def _add(self, name):
         self.__attr_names.add(name)
 
     def _build_exc_msg(self):
-        exc_msg = f"Module '{self.__name__}' not found."
+        exc_msg = f"Module '{self.__name__}' cannot be loaded in tungstenkit's Python environment."
         if self.__help_msg_on_err:
             exc_msg += "\n" + self.__help_msg_on_err
         return exc_msg
@@ -86,6 +86,10 @@ class UnknownModuleFinder(importlib.abc.MetaPathFinder):
         self._loader = loader
 
     def find_spec(self, fullname, path, target=None):
+        if self._loader.is_registered(fullname):
+            return self._gen_spec(fullname)
+
+    def _gen_spec(self, fullname):
         spec = importlib.machinery.ModuleSpec(fullname, self._loader)
         return spec
 
@@ -95,9 +99,20 @@ class UnknownModuleLazyLoader(importlib.abc.Loader):
         self._help_msg_on_err = help_msg_on_err
         self._registered: Dict[str, UnknownModule] = dict()
 
+    def register(self, fullname: str, module_attr: Optional[str] = None):
+        dot_separated = fullname.split(".")
+        for i in range(len(dot_separated)):
+            name = ".".join(dot_separated[: i + 1])
+            self._registered[name] = UnknownModule(name, self._help_msg_on_err)
+        if fullname in self._registered and module_attr:
+            self._registered[fullname]._add(module_attr)
+
+    def is_registered(self, fullname: str):
+        return fullname in self._registered
+
     def create_module(self, spec):
-        self._registered[spec.name] = UnknownModule(spec.name, self._help_msg_on_err)
-        return self._registered[spec.name]
+        if spec.name in self._registered:
+            return self._registered[spec.name]
 
     def exec_module(self, module):
         pass
@@ -144,11 +159,20 @@ def get_imports(path):
 
 
 @contextmanager
-def lazy_import_ctx(help_msg_on_err: Optional[str] = None):
+def lazy_import_ctx(imports: List[Import], help_msg_on_err: Optional[str] = None):
     loader = UnknownModuleLazyLoader(help_msg_on_err)
     finder = UnknownModuleFinder(loader)
     try:
-        sys.meta_path.append(finder)
+        sys.meta_path.insert(0, finder)
+        for imp in imports:
+            try:
+                importlib.import_module(".".join(imp.module) if imp.module else ".".join(imp.name))
+            except Exception:
+                if imp.module:
+                    attr_name = ".".join(imp.name)
+                    loader.register(".".join(imp.module), attr_name if attr_name else None)
+                else:
+                    loader.register(".".join(imp.name))
         yield
     finally:
         for module_name in loader._registered.keys():
@@ -169,13 +193,10 @@ def import_module_in_lazy_import_ctx(
         raise ModuleNotFoundError(
             f"Failed to initialize module '{module}'. Is it a Python module?"
         )
-    try:
+    imports = get_imports(spec.origin)
+    with lazy_import_ctx(imports, help_msg_on_unknown_module_exec):
         mod = importlib.import_module(module)
         return mod
-    except ModuleNotFoundError:
-        with lazy_import_ctx(help_msg_on_unknown_module_exec):
-            mod = importlib.import_module(module)
-            return mod
 
 
 def check_module(module: str) -> bool:

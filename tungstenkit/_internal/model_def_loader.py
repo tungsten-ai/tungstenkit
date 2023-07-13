@@ -146,8 +146,8 @@ def _find_model_class(module_ref: str) -> type:
 def _import_module(module_ref: str, lazy_import: bool) -> "ModuleType":
     if lazy_import:
         help_msg_on_lazy_import_err = (
-            f"Lazy import of module '{module_ref}' is failed. "
-            "Modules not found should not be executed during lazy import."
+            "Please don't execute modules that specific models depend on, "
+            "either globally or within IO definitions. "
         )
         tungsten_model_module = import_module_in_lazy_import_ctx(
             module_ref,
