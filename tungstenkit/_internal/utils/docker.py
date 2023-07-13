@@ -280,8 +280,7 @@ def remove_docker_image(
 ):
     docker_client = docker_client if docker_client else get_docker_client()
     try:
-        image: Image = docker_client.images.get(image_name_or_id)
-        image.remove(force=force)
+        docker_client.api.remove_image(image_name_or_id, force=force)
     except (docker_errors.NotFound, docker_errors.APIError) as e:
         if force:
             return
