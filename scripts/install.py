@@ -743,7 +743,7 @@ class Installer:
         if self.version_file.exists():
             current_version = self.version_file.read_text().strip()
 
-        self._write(colorize("info", "Retrieving Tungstenkit metadata"))
+        self._write(colorize("info", "Retrieving tungstenkit metadata"))
 
         metadata = json.loads(self._get(self.METADATA_URL).decode())
 
