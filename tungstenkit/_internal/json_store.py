@@ -180,7 +180,7 @@ class JSONStore(t.Generic[ItemType]):
 
         item = col.get_item_by_tag(repo, tag)
         if item is None:
-            self._build_not_found_err_msg(name)
+            raise exceptions.NotFound(self._build_not_found_err_msg(name))
         attrs_kwargs = {k: v for k, v in attrs.asdict(item, recurse=False).items() if k != "tag"}
         return self._item_type(tag=tag, **attrs_kwargs)  # type: ignore
 

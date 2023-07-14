@@ -42,6 +42,9 @@ class LocalFSFileUploader(AbstractFileUploader):
             else:
                 time.sleep(0.1)
 
+        for p in saved_paths:
+            p.chmod(0o666)
+
         if not all_files_exist:
             raise exceptions.UploadError("Failed to save files to the volume")
 
