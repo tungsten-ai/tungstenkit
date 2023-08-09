@@ -25,3 +25,7 @@ def camel_to_snake(name: str) -> str:
 
 def get_common_prefix(*strings: str):
     return "".join(c[0] for c in takewhile(lambda x: all(x[0] == y for y in x), zip(*strings)))
+
+
+def split_camel_case(string: str):
+    return re.sub("([A-Z][a-z]+)", r" \1", re.sub("([A-Z]+)", r" \1", string)).split()

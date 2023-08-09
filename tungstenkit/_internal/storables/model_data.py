@@ -2,6 +2,7 @@ import typing as t
 from datetime import datetime
 
 import attrs
+from docker import errors as docker_errors
 
 from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
@@ -41,7 +42,10 @@ class _ModelDataInImage:
     @staticmethod
     def from_image(docker_image_name: str):
         docker_client = get_docker_client()
-        docker_image = docker_client.images.get(docker_image_name)
+        try:
+            docker_image = docker_client.images.get(docker_image_name)
+        except docker_errors.ImageNotFound as exc:
+            raise exceptions.ModelImageNotFound(docker_image_name) from exc
         docker_image_id = docker_image.id
 
         env_vars: t.Optional[t.List[str]] = docker_image.attrs["Config"]["Env"]

@@ -281,9 +281,15 @@ def remove_docker_image(
     docker_client = docker_client if docker_client else get_docker_client()
     try:
         docker_client.api.remove_image(image_name_or_id, force=force)
-    except (docker_errors.NotFound, docker_errors.APIError) as e:
-        if force:
-            return
+
+    # Do nothing if the image already removed
+    except docker_errors.ImageNotFound:
+        pass
+    except docker_errors.APIError as e:
+        if e.status_code != 404:
+            raise DockerError(str(e))
+
+    except docker_errors.DockerException as e:
         raise DockerError(str(e))
 
 

@@ -15,7 +15,7 @@ from tungstenkit._internal.logging import log_debug
 from tungstenkit._internal.utils.docker import parse_docker_image_name
 from tungstenkit._internal.utils.file import write_safely
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
-from tungstenkit._internal.utils.string import camel_to_snake
+from tungstenkit._internal.utils.string import camel_to_snake, split_camel_case
 from tungstenkit._internal.utils.types import get_superclass_type_args
 
 StorableType = t.TypeVar("StorableType", bound="JSONStorable")
@@ -98,6 +98,10 @@ class JSONItem(abc.ABC):
     def get_typename(cls) -> str:
         return camel_to_snake(cls.__name__)
 
+    @classmethod
+    def get_human_readable_typename(cls) -> str:
+        return split_camel_case(cls.__name__)
+
 
 # TODO encapsulate JSONCollection
 class JSONStore(t.Generic[ItemType]):
@@ -127,8 +131,14 @@ class JSONStore(t.Generic[ItemType]):
         """Add to the colleciton and prune dangling items"""
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
-            col.add_item(item)
-            self._gc(col)
+            existing_item = col.get_item_by_tag(repo_name=item.repo_name, tag=item.tag)
+
+            if existing_item:
+                self.update(item)
+            else:
+                col.add_item(item)
+                self._gc(col)
+
             col.save(self.collection_path)
 
     def tag(self, src_name: str, dest_name: str) -> str:
@@ -151,10 +161,19 @@ class JSONStore(t.Generic[ItemType]):
     def update(self, item: ItemType) -> None:
         with self._filelock:
             col = self._collection_type.load(self._item_type, self.collection_path)
+
+            # First, try to get by id
             orig = col.get_item_by_id(item.id)
             if orig is None:
-                raise exceptions.NotFound(self._build_not_found_err_msg(item.name))
-            col.update_item(item)
+                # Second, try to get by name
+                orig = col.get_item_by_tag(repo_name=item.repo_name, tag=item.tag)
+                if orig is None:
+                    raise exceptions.NotFound(self._build_not_found_err_msg(item.name))
+                else:
+                    col.add_item(item)
+            else:
+                col.update_item(item)
+
             col.save(self.collection_path)
 
     def get(self, name: str) -> ItemType:
@@ -246,7 +265,7 @@ class JSONStore(t.Generic[ItemType]):
         return blobs
 
     def _build_not_found_err_msg(self, name: str):
-        return f"{self._item_type.get_typename()} '{name}'"
+        return f"{self._item_type.get_human_readable_typename()} '{name}'"
 
 
 @attrs.frozen

@@ -37,7 +37,11 @@ class NotFound(TungstenException):
     pass
 
 
-class ModelImageNotFound(TungstenException):
+class ModelNotFound(NotFound):
+    pass
+
+
+class ModelImageNotFound(NotFound):
     pass
 
 
