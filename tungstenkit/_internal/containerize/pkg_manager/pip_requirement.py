@@ -8,7 +8,7 @@ from packaging.version import Version
 @attrs.frozen
 class PipRequirement:
     name: str
-    spec: t.Optional[Version | SpecifierSet] = attrs.field(default=None)
+    spec: t.Optional[t.Union[Version, SpecifierSet]] = attrs.field(default=None)
     index_url: t.Optional[str] = attrs.field(default=None)
     extra_index_url: t.Optional[str] = attrs.field(default=None)
 

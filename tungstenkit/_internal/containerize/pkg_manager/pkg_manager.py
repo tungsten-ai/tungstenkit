@@ -71,7 +71,7 @@ class PythonPackageManager:
         specifier_list = list(specifier_set)
 
         if len(specifier_set) == 1 and specifier_list[0].operator == "==":
-            spec: Version | SpecifierSet = Version(specifier_list[0].version)
+            spec: t.Union[Version, SpecifierSet] = Version(specifier_list[0].version)
         else:
             spec = specifier_set
 
