@@ -26,7 +26,7 @@ class GPUPackageRelease:
 @attrs.define
 class GPUPackageConstraint:
     pkg_name: t.Optional[str] = attrs.field(default=None)
-    pkg_spec: t.Optional[SpecifierSet | Version] = attrs.field(default=None)
+    pkg_spec: t.Optional[t.Union[SpecifierSet, Version]] = attrs.field(default=None)
     no_cuda: t.Optional[bool] = attrs.field(default=None)
     cuda_ver: t.Optional[Version] = attrs.field(default=None)
     any_cuda_in: t.Optional[t.Iterable[Version]] = attrs.field(default=None)
