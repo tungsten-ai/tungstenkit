@@ -99,7 +99,11 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
                 )
             elif cuda_ver is not None:
                 py_pkg_manager.set_cuda_equal_to(cuda_ver)
-                cudnn_ver = py_pkg_manager.infer_cudnn_ver()
+                cudnn_ver = (
+                    self.config.cudnn_version
+                    if self.config.cudnn_version
+                    else py_pkg_manager.infer_cudnn_ver()
+                )
 
         py_ver = py_ver if py_ver else py_pkg_manager.infer_python_ver()
         py_pkg_manager.set_python_equal_to(py_ver)
@@ -128,16 +132,19 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
         # Set base image
         if self.config.base_image:
             image: BaseImage = CustomImage(self.config.base_image)
-        elif not isinstance(cuda_ver, NotRequired) and py_pkg_manager.requires_system_cuda():
+        elif not isinstance(cuda_ver, NotRequired) and (
+            (self.config.force_install_system_cuda and self.config.cuda_version)
+            or py_pkg_manager.requires_system_cuda()
+        ):
             log_info("Fetching the list of cuda base images")
-            cuda_image_collection = CUDAImageCollection.from_docker_hub()
+            cuda_image_collection = CUDAImageCollection.from_remote()
             if cuda_ver is None:  # Requires CUDA but any version is okay
                 image = cuda_image_collection.get_latest_image()
             else:
                 image = cuda_image_collection.get_cuda_image_by_cuda_cudnn_ver(cuda_ver, cudnn_ver)
         else:
             log_info("Fetching the list of python base images")
-            python_image_collection = PythonImageCollection.from_docker_hub()
+            python_image_collection = PythonImageCollection.from_remote()
             image = python_image_collection.get_py_image_by_ver(py_ver)
 
         large_files, small_files = self.split_large_and_small_files(
@@ -189,9 +196,8 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
                     ret = split(path)
                     large_files.extend(ret[0])
                     small_files.extend(ret[1])
-
-                else:
-                    size = path.stat(follow_symlinks=False).st_size
+                elif not path.is_symlink():
+                    size = path.stat().st_size
                     if size > LARGE_FILE_THRESHOLD:
                         large_files.append(path)
                     else:
@@ -224,6 +230,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 def _get_size_of_copy_target(path: Path):
     if path.is_dir():
         size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
-    else:
-        size = path.stat(follow_symlinks=False).st_size
+    elif not path.is_symlink():
+        size = path.stat().st_size
     return size

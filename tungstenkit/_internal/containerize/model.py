@@ -48,12 +48,12 @@ def build_model(
                 repo_name, tag = parse_docker_image_name(model_name)
                 id = None
                 if tag is None:
-                    tag = storables.ModelData.generate_id()
-                    id = tag
+                    id = storables.ModelData.generate_id()
+                    tag = id[:7]
                 model_name = f"{repo_name}:{tag}"
 
                 # Build
-                names = [model_name] if tag == "latest" else [model_name, f"{repo_name}:latest"]
+                names = [model_name]
                 build_ctx.build(tags=names)
 
                 # Add to the local store

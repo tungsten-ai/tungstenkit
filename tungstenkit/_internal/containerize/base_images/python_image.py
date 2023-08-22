@@ -33,10 +33,10 @@ class PythonImageCollection:
     @staticmethod
     def from_file():
         # TODO implement this
-        return PythonImageCollection.from_docker_hub()
+        return PythonImageCollection.from_remote()
 
     @staticmethod
-    def from_docker_hub():
+    def from_remote():
         # Fetch all tags from docker hub
         tags = fetch_tags_from_docker_hub_repo(PythonImage.get_repository())
 

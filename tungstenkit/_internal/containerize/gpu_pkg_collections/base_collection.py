@@ -64,7 +64,7 @@ class GPUPackageCollection(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def name(cls):
+    def typename(cls):
         return removesuffix(cls.__name__, "Collection").lower()
 
     @staticmethod

@@ -100,7 +100,7 @@ class JSONItem(abc.ABC):
 
     @classmethod
     def get_human_readable_typename(cls) -> str:
-        return split_camel_case(cls.__name__)
+        return "".join(split_camel_case(cls.__name__))
 
 
 # TODO encapsulate JSONCollection

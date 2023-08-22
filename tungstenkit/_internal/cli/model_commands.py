@@ -110,13 +110,11 @@ def build(
     )
     print()
     success_msg = f"Successfully built tungsten model: '{model_data.repo_name}:{model_data.tag}' "
-    if model_data.tag != "latest":
-        success_msg += f"(also tagged as '{model_data.repo_name}:latest')"
     print_success(success_msg)
     print("\n- Run demo service:")
-    print_pretty(f"  $ tungsten demo [green]{model_data.repo_name}:latest[/green]")
+    print_pretty(f"  $ tungsten demo [green]{model_data.repo_name}:{model_data.tag}[/green]")
     print("\n- Run prediction service:")
-    print_pretty(f"  $ tungsten serve [green]{model_data.repo_name}:latest[/green]")
+    print_pretty(f"  $ tungsten serve [green]{model_data.repo_name}:{model_data.tag}[/green]")
 
 
 @model.command()

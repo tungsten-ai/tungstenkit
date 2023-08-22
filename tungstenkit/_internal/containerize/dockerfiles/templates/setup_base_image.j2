@@ -2,11 +2,12 @@
 
 FROM {{ image.get_repository() }}:{{ image.get_tag() }}
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive
-RUN {{ cache.mount_apt_cache() }} apt-get update -y && \
-    apt-get install -y --no-install-recommends tini
+RUN {{ cache.mount_apt_cache() }} apt-get update -y
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
+RUN chmod +x /tini
 WORKDIR {{ home_dir_in_container.as_posix() }}
 
-{% if image.type() == "cuda" %}
+{% if image.typename() == "cuda" %}
 {% include './install_python.j2' %}
 {% endif %}
 

@@ -5,7 +5,9 @@ from .common import GPUPackageConstraint, GPUPackageRelease
 from .tf_collection import TFCollection
 from .torch_collection import TorchCollection
 
-gpu_pkg_collection_class_dict = {cls.name(): cls for cls in GPUPackageCollection.__subclasses__()}
+gpu_pkg_collection_class_dict = {
+    cls.typename(): cls for cls in GPUPackageCollection.__subclasses__()
+}
 
 supported_gpu_pkg_names: Set[str] = set.union(
     *[cls.get_pkg_names() for cls in gpu_pkg_collection_class_dict.values()]

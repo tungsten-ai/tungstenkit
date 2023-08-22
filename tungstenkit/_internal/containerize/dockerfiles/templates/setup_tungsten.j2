@@ -4,7 +4,7 @@
 ENV{% for key, val in tungsten_env_vars.items() %} {{ key }}={{ val }}{% endfor %}
 {% endif %}
 
-ENTRYPOINT ["/usr/bin/tini","--","python"{% for e in python_entrypoint.split() %},"{{ e }}"{% endfor %}]
+ENTRYPOINT ["/tini","--","python"{% for e in python_entrypoint.split() %},"{{ e }}"{% endfor %}]
 
 LABEL device="{{ device }}"
 {% if gpu_mem_gb %}

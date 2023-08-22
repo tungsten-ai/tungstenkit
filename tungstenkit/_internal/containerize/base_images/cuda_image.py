@@ -7,7 +7,7 @@ from packaging.version import Version
 from tungstenkit._internal.utils.version import check_if_two_versions_compatible
 from tungstenkit.exceptions import NoCompatibleCUDAImage
 
-from .base_image import BaseImage
+from .base_image import BaseImage, BaseImageCollection
 from .common import fetch_tags_from_docker_hub_repo
 
 RE_CUDA_IMAGE = (
@@ -34,16 +34,16 @@ class CUDAImage(BaseImage):
 
 
 @attrs.define
-class CUDAImageCollection:
+class CUDAImageCollection(BaseImageCollection):
     images: t.List[CUDAImage]
 
-    @staticmethod
-    def from_file():
+    @classmethod
+    def from_file(cls):
         # TODO implement this
-        return CUDAImageCollection.from_docker_hub()
+        return CUDAImageCollection.from_remote()
 
-    @staticmethod
-    def from_docker_hub():
+    @classmethod
+    def from_remote(cls):
         # Fetch all tags from docker hub
         tags = fetch_tags_from_docker_hub_repo(CUDAImage.get_repository())
 
@@ -64,7 +64,6 @@ class CUDAImageCollection:
                         ubuntu_ver=ubuntu_ver,
                     )
                 )
-
         return CUDAImageCollection(images=images)
 
     def get_cuda_image_by_cuda_cudnn_ver(
@@ -83,3 +82,11 @@ class CUDAImageCollection:
 
     def get_latest_image(self) -> CUDAImage:
         return max(self.images)
+
+
+# def fetch_cuda_image_tags():
+#     url = "https://catalog.ngc.nvidia.com/_next/data/dj6JMKsmIGaYZMqoDIyx5/orgs/nvidia/containers/cuda/tags.json?orgName=nvidia&resourceType=containers&slug=cuda&slug=tags"
+#     r = requests.get(url)
+#     r.raise_for_status()
+#     body = r.json()
+#     return body["pageProps"]["data"]["tags"]

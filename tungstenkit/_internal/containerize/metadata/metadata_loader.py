@@ -9,7 +9,7 @@ import attrs
 import cattrs
 from filelock import FileLock
 
-from tungstenkit._internal.containerize.base_images import BaseImage
+from tungstenkit._internal.containerize.base_images import BaseImage, BaseImageCollection
 from tungstenkit._internal.containerize.gpu_pkg_collections import (
     GPUPackageCollection,
     gpu_pkg_collection_class_dict,
@@ -19,6 +19,8 @@ from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_at
 from tungstenkit.exceptions import StoredDataError
 
 METADATA_DIR = Path(__file__).parent
+BASE_IMAGE_METADATA_DIR = METADATA_DIR / "base_images"
+GPU_PKG_METADATA_DIR = METADATA_DIR / "gpu_pkgs"
 METADATA_REFRESH_INTERVAL_DAYS = 15
 FILELOCK_TIMEOUT = 180.0
 
@@ -62,16 +64,19 @@ class MetadataLoader:
         return load_attrs_from_json(metadata_class, path)
 
     def update_gpu_pkg_collection(self, gpu_pkg_collection: GPUPackageCollection):
-        filename = gpu_pkg_collection.name() + "-metadata.json"
+        filename = gpu_pkg_collection.typename() + "-metadata.json"
         blob = blob_store.add_by_writing(
             (convert_attrs_to_json(gpu_pkg_collection).encode("utf-8"), filename)
         )
         with self.collection_filelock:
             metadata_collection = self._load_metadata_collection()
-            metadata_collection.gpu_pkg_metadata[gpu_pkg_collection.name()] = StoredMetadata(
+            metadata_collection.gpu_pkg_metadata[gpu_pkg_collection.typename()] = StoredMetadata(
                 data_json=blob
             )
             self._save_metadata_collection(metadata_collection)
+
+    @classmethod
+    def build_base_image_metadata_path(cls, collection_cls: BaseImage):
 
     @classmethod
     def load_gpu_pkg_metadata(cls, collection_name: str):
@@ -79,7 +84,6 @@ class MetadataLoader:
 
     @classmethod
     def load_metadata(cls, metadata_cls, name: str, base_dir: Path):
-        with 
         path = cls.build_metadata_path(name, base_dir)
         try:
             metadata = load_attrs_from_json(metadata_cls, path)
@@ -92,7 +96,6 @@ class MetadataLoader:
         serialized = convert_attrs_to_json(metadata)
         path = cls.build_metadata_path(name, base_dir)
         write_safely(path, serialized)
-
 
     @staticmethod
     def build_metadata_dir(name: str, base_dir: Path):

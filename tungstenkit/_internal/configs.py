@@ -78,6 +78,8 @@ class BuildConfig(BaseModel):
     dockerfile_commands: t.List[str] = Field(default_factory=list)
     python_version: t.Optional[_Version] = None
     cuda_version: t.Optional[_Version] = None
+    cudnn_version: t.Optional[_Version] = None
+    force_install_system_cuda: bool = False
 
     base_image: t.Optional[str] = None
 
