@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tungstenkit"
-version = "0.1.19"
+version = "0.1.20"
 description = "ML container made simple"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
 homepage = "https://github.com/tungsten-ai/tungstenkit"
@@ -42,8 +42,8 @@ tungsten = "tungstenkit._internal.cli.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.7"
-attrs = "^23"
-cattrs = "^23"
+attrs = ">=22"
+cattrs = ">=22"
 pyyaml = ">=5.3.1"
 pathspec = "^0.10.2"
 loguru = ">=0.6.0, <1.0.0"
