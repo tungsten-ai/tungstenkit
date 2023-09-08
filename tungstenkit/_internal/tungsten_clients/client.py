@@ -11,7 +11,7 @@ from tungstenkit._internal import storables
 from tungstenkit._internal.configs import TungstenClientConfig
 from tungstenkit._internal.logging import log_debug, log_info
 from tungstenkit._internal.utils.console import print_success
-from tungstenkit._internal.utils.docker import (
+from tungstenkit._internal.utils.docker_client import (
     PullPushFailureReason,
     get_docker_client,
     login_to_docker_registry,

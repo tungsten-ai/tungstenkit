@@ -2,7 +2,7 @@ import typing as t
 
 from tungstenkit import exceptions
 from tungstenkit._internal.json_store import JSONStore
-from tungstenkit._internal.storables.model_data import ModelData, StoredModelData
+from tungstenkit._internal.storables.model import ModelData, StoredModelData
 
 _store = JSONStore[StoredModelData](StoredModelData)
 

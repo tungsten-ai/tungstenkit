@@ -12,7 +12,7 @@ from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStorable, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DATA_DIR, LOCK_DIR
 from tungstenkit._internal.logging import log_debug
-from tungstenkit._internal.utils.docker import parse_docker_image_name
+from tungstenkit._internal.utils.docker_client import parse_docker_image_name
 from tungstenkit._internal.utils.file import write_safely
 from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 from tungstenkit._internal.utils.string import camel_to_snake, split_camel_case

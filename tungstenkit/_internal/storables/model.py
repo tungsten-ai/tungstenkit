@@ -8,17 +8,17 @@ from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DEFAULT_GPU_MEM_GB
 from tungstenkit._internal.json_store import JSONItem, JSONStorable
-from tungstenkit._internal.utils.docker import (
+from tungstenkit._internal.utils.docker_client import (
     get_docker_client,
     parse_docker_image_name,
     remove_docker_image,
 )
 from tungstenkit._internal.utils.serialize import load_attrs_from_json
 
-from .avatar_data import AvatarData, StoredAvatar
-from .markdown_data import MarkdownData, StoredMarkdown
-from .model_io_data import ModelIOData, StoredModelIOData
-from .source_file_data import (
+from .avatar import AvatarData, StoredAvatar
+from .markdown import MarkdownData, StoredMarkdown
+from .model_io import ModelIOData, StoredModelIOData
+from .source_file_collection import (
     SerializedSourceFileCollection,
     SourceFile,
     SourceFileCollection,

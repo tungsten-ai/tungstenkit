@@ -6,7 +6,7 @@ from tungstenkit._internal import storables
 from tungstenkit._internal.constants import DEFAULT_MODEL_MODULE, default_model_repo
 from tungstenkit._internal.model_def_loader import create_model_def_loader
 from tungstenkit._internal.utils.context import change_syspath, change_workingdir
-from tungstenkit._internal.utils.docker import parse_docker_image_name
+from tungstenkit._internal.utils.docker_client import parse_docker_image_name
 
 from .build_context import setup_build_ctx
 from .dockerfiles import ModelDockerfile

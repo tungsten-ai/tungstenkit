@@ -101,6 +101,7 @@ class BuildConfig(BaseModel):
                     "Tungstenkit supports Python version "
                     f"from {MIN_SUPPORTED_PYTHON_VER} to {MAX_SUPPORTED_PYTHON_VER}"
                 )
+        return v
 
 
 class ModelConfig(BuildConfig):

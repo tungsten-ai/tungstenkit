@@ -62,7 +62,10 @@ def serve(
     from tungstenkit._internal.io import SUPPORTED_URL_SCHEMES_FOR_FILES
     from tungstenkit._internal.model_def_loader import create_model_def_loader
 
-    mp.set_start_method("spawn")  # For CUDA
+    try:
+        mp.set_start_method("spawn")  # For CUDA
+    except RuntimeError:
+        pass
     contexts.APP = contexts.Application.MODEL_SERVER
 
     path = tempfile.mkdtemp()

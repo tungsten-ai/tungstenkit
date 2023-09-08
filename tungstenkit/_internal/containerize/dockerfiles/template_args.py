@@ -13,7 +13,14 @@ from ..base_images import BaseImage
 class TemplateArgs:
     # Docker
     image: BaseImage
+    large_files_image_name: t.Optional[str]
+
+    # Tungsten
     python_entrypoint: str
+    large_file_rel_paths: t.List[Path]
+    tungsten_env_vars: t.Dict[str, str] = attrs.field(factory=dict)
+    home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
+    copy_files: t.List[t.Tuple[str, str]] = attrs.field(factory=list)
 
     # System
     device: str
@@ -27,10 +34,3 @@ class TemplateArgs:
     pip_wheels_in_build_ctx: t.List[Path] = attrs.field(factory=list)
     pip_requirements_txt_in_build_ctx: t.Optional[Path] = attrs.field(default=None)
     list_pip_install_args: t.List[t.List[str]] = attrs.field(factory=list)
-
-    # Tungsten
-    tungsten_env_vars: t.Dict[str, str] = attrs.field(factory=dict)
-    home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
-    large_files: t.List[Path] = attrs.field(factory=list)
-    small_files: t.List[Path] = attrs.field(factory=list)
-    copy_files: t.List[t.Tuple[str, str]] = attrs.field(factory=list)

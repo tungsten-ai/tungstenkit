@@ -322,7 +322,7 @@ def copy_from_image(
         remove_docker_container(container.id, docker_client=docker_client)
 
 
-def export_image_to_file(
+def export_docker_image_to_file(
     image_name_or_id: str,
     output_path: Path,
     image_desc: t.Optional[str] = None,
@@ -344,8 +344,12 @@ def export_image_to_file(
         remove_docker_container(container.id, docker_client=docker_client)
 
 
-def import_image_from_file(tarball_path: Path, name: str):
+def import_docker_image_from_file(tarball_path: Path, name: str):
     _import(str(tarball_path), name, err_msg=f"Failed to import '{tarball_path}' to {name}")
+
+
+def load_docker_image_from_file(tarball_path: Path):
+    _load(str(tarball_path), err_msg=f"Failed to load '{tarball_path}")
 
 
 @contextmanager
@@ -585,5 +589,12 @@ def _export(container_name_or_id: str, output: str, err_msg: str):
 def _import(tarball: str, name: str, err_msg: str):
     try:
         subprocess.run(["docker", "import", tarball, name], check=True)
+    except subprocess.CalledProcessError:
+        raise DockerError(err_msg)
+
+
+def _load(tarball: str, err_msg: str):
+    try:
+        subprocess.run(["docker", "load", "-i", tarball], check=True)
     except subprocess.CalledProcessError:
         raise DockerError(err_msg)

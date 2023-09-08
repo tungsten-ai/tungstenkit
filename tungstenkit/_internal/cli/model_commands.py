@@ -19,7 +19,7 @@ from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
 from tungstenkit._internal.storables import ModelData
 from tungstenkit._internal.tungsten_clients import TungstenClient
-from tungstenkit._internal.utils import docker
+from tungstenkit._internal.utils import docker_client
 from tungstenkit._internal.utils.console import print_pretty, print_success, yes_or_no_prompt
 from tungstenkit._internal.utils.string import removeprefix
 
@@ -186,7 +186,7 @@ def tag(src: str, target: str, **kwargs):
     """
 
     m = model_store.get(src)
-    c = docker.get_docker_client()
+    c = docker_client.get_docker_client()
     img = c.images.get(m.name)
     img.tag(target)
     model_store.add(
@@ -277,7 +277,7 @@ def serve(model_name: str, port: int, batch_size: t.Optional[int], log_level: st
     if batch_size:
         docker_run_args += ["--batch-size", str(batch_size)]
     print(TUNGSTEN_LOGO)
-    docker.run(*(docker_run_args + model_container_args))
+    docker_client.run(*(docker_run_args + model_container_args))
 
 
 @model.command()
@@ -327,7 +327,7 @@ def extract(model_name: str, save_dir: str, **kwargs):
     'MODEL_NAME' should be in the '<repo name>[:<tag>]' format
     """
     model_data = model_store.get(model_name)
-    docker.copy_from_image(
+    docker_client.copy_from_image(
         model_data.id, TUNGSTEN_DIR_IN_CONTAINER, Path(save_dir), image_desc=model_data.name
     )
 

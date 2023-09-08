@@ -15,7 +15,7 @@ from tungstenkit import exceptions
 from tungstenkit._internal.logging import log_info
 from tungstenkit._internal.model_server.enums import ModelServerMode
 from tungstenkit._internal.storables import ModelData
-from tungstenkit._internal.utils.docker import ServerContainer, start_server_container
+from tungstenkit._internal.utils.docker_client import ServerContainer, start_server_container
 from tungstenkit._internal.utils.file import convert_to_unique_path
 from tungstenkit._internal.utils.json import apply_to_jsonable
 from tungstenkit._internal.utils.uri import (

@@ -6,7 +6,7 @@ import urllib3
 
 from tungstenkit._internal.logging import init_logger, log_exception
 from tungstenkit._internal.utils.context import hide_traceback
-from tungstenkit._internal.utils.docker import check_if_docker_available
+from tungstenkit._internal.utils.docker_client import check_if_docker_available
 from tungstenkit._versions import pkg_version
 
 from .login_command import login

@@ -30,9 +30,13 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def generate(
         self,
         tmp_dir_in_build_ctx: Path,
+        large_files_image_name: t.Optional[str],
+        large_file_rel_paths: t.List[Path],
     ):
         template_args = self.build_template_args(
             tmp_dir_in_build_ctx=tmp_dir_in_build_ctx,
+            large_files_image_name=large_files_image_name,
+            large_file_rel_paths=large_file_rel_paths,
         )
         log_debug("Dockerfile template args:\n" + str(template_args))
         log_info("\n")
@@ -57,6 +61,8 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def build_template_args(
         self,
         tmp_dir_in_build_ctx: Path,
+        large_files_image_name: t.Optional[str],
+        large_file_rel_paths: t.List[Path],
     ):
         # TODO perfer cuda version available in docker hub
         # TODO check py vers compatible with miniforge3
@@ -147,12 +153,14 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             python_image_collection = PythonImageCollection.from_remote()
             image = python_image_collection.get_py_image_by_ver(py_ver)
 
-        large_files, small_files = self.split_large_and_small_files(
-            Path("."), tmp_dir_in_build_ctx
-        )
+        # large_files, small_files = self.split_large_and_small_files(
+        #     Path("."), tmp_dir_in_build_ctx
+        # )
 
         template_args = TemplateArgs(
             image=image,
+            large_files_image_name=large_files_image_name,
+            large_file_rel_paths=large_file_rel_paths,
             python_version=py_ver,
             python_entrypoint=self.python_entrypoint(),
             pip_requirements_txt_in_build_ctx=pip_requirements_txt_path,
@@ -163,8 +171,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             tungsten_env_vars=self.config.tungsten_environment_variables,
             copy_files=self.config.copy_files,
             device="gpu" if self.config.gpu else "cpu",
-            large_files=large_files,
-            small_files=small_files,
             gpu_mem_gb=self.config.gpu_mem_gb,
         )
 
