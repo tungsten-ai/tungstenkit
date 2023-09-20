@@ -4,11 +4,13 @@
 ENV{% for key, val in env_vars.items() %} {{ key }}={{ val }}{% endfor %}
 {% endif %}
 
+{% if not skip_install_python_packages %}
 RUN {{ cache.mount_pip_cache() }} pip install --upgrade pip
 {% if list_pip_install_args|length > 0 %}
 {% for args in list_pip_install_args %}
 RUN {{ cache.mount_pip_cache() }} pip install {{ " ".join(args) }}
 {% endfor %}
+{% endif %}
 {% endif %}
 
 {% if large_file_rel_paths|length > 0 %}
@@ -25,11 +27,13 @@ COPY {{ path.as_posix() }} /tmp/wheels
 RUN rm -rf /tmp/wheels
 {% endif %}
 
+{% if not skip_install_python_packages %}
 {% if pip_requirements_txt_in_build_ctx != None %}
 COPY --link {{ pip_requirements_txt_in_build_ctx.as_posix() }} /tmp/requirements.txt
 RUN {{ cache.mount_pip_cache() }} pip install -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 {% endif%}
+{% endif %}
 
 {% if dockerfile_commands|length > 0 %}
 {% for cmd in dockerfile_commands %}

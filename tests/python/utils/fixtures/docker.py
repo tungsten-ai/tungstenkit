@@ -4,7 +4,7 @@ from uuid import uuid4
 import attrs
 import pytest
 
-from tungstenkit._internal.utils.docker import get_docker_client, remove_docker_image
+from tungstenkit._internal.utils.docker_client import get_docker_client, remove_docker_image
 
 DUMMY_FS_ROOT = PurePosixPath("/dummy")
 

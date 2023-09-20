@@ -53,8 +53,7 @@ def build_model(
                 model_name = f"{repo_name}:{tag}"
 
                 # Build
-                names = [model_name]
-                build_ctx.build(tags=names)
+                build_ctx.build(tag=model_name)
 
                 # Add to the local store
                 io_schema = storables.ModelIOData(
@@ -71,14 +70,13 @@ def build_model(
                 else:
                     readme = None
 
-                for name in names:
-                    model_data = storables.ModelData(
-                        name=name,
-                        io_data=io_schema,
-                        avatar=avatar,
-                        readme=readme,
-                        id=id,
-                        source_files=build_ctx.walk_fs(),
-                    )
-                    model_data.save()
+                model_data = storables.ModelData(
+                    name=name,
+                    io_data=io_schema,
+                    avatar=avatar,
+                    readme=readme,
+                    id=id,
+                    source_files=build_ctx.walk_fs(),
+                )
+                model_data.save()
                 return storables.ModelData.load(model_name)

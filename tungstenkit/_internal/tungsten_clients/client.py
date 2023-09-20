@@ -23,7 +23,7 @@ from tungstenkit._internal.utils.uri import strip_scheme_in_http_url
 from . import schemas
 from .api_client import TungstenAPIClient
 
-DOCKER_CLIENT_TIMEOUT = 10
+DOCKER_CLIENT_TIMEOUT = 60
 
 
 class TungstenClient:

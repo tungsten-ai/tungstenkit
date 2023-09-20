@@ -1,7 +1,7 @@
 import pytest
 
 from tungstenkit._internal.containerize import build_model
-from tungstenkit._internal.utils.docker import remove_docker_image
+from tungstenkit._internal.utils.docker_client import remove_docker_image
 
 from .. import dummy_model
 

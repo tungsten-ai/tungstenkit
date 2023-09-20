@@ -5,7 +5,6 @@ from pathlib import Path
 import attrs
 import jinja2
 from packaging.version import Version
-from pathspec import PathSpec
 
 import tungstenkit
 from tungstenkit._internal.configs import BuildConfig
@@ -30,13 +29,15 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def generate(
         self,
         tmp_dir_in_build_ctx: Path,
-        large_files_image_name: t.Optional[str],
-        large_file_rel_paths: t.List[Path],
+        # large_files_image_name: t.Optional[str],
+        # large_file_rel_paths: t.List[Path],
     ):
         template_args = self.build_template_args(
             tmp_dir_in_build_ctx=tmp_dir_in_build_ctx,
-            large_files_image_name=large_files_image_name,
-            large_file_rel_paths=large_file_rel_paths,
+            # large_files_image_name=large_files_image_name,
+            # large_file_rel_paths=large_file_rel_paths,
+            large_files_image_name=None,
+            large_file_rel_paths=[],
         )
         log_debug("Dockerfile template args:\n" + str(template_args))
         log_info("\n")
@@ -88,7 +89,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
         py_pkg_manager.set_gpu(self.config.gpu)
 
         # Infer CUDA, CuDNN and Python versions if requested
-        if self.config.gpu:
+        if self.config.gpu and not self.config.base_image:
             if cuda_ver is None:
                 cuda_ver = py_pkg_manager.infer_cuda_ver()
             else:
@@ -137,6 +138,9 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
         # Set base image
         if self.config.base_image:
+            log_warning(
+                "Using custom base image. No system and Python packages will be installed."
+            )
             image: BaseImage = CustomImage(self.config.base_image)
         elif not isinstance(cuda_ver, NotRequired) and (
             (self.config.force_install_system_cuda and self.config.cuda_version)
@@ -172,70 +176,13 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             copy_files=self.config.copy_files,
             device="gpu" if self.config.gpu else "cpu",
             gpu_mem_gb=self.config.gpu_mem_gb,
+            skip_install_python_packages=self.config.base_image is not None,
+            skip_install_system_packages=self.config.base_image is not None,
         )
 
         return template_args
-
-    def split_large_and_small_files(
-        self,
-        curr_dir: Path,
-        tmp_dir_in_build_ctx: Path,
-    ) -> t.Tuple[t.List[Path], t.List[Path]]:
-        """
-        Returns large file paths and small file paths as lists.
-        If there is no large files, returns ``None``.
-        """
-        include_spec = PathSpec.from_lines("gitwildmatch", self.config.include_files)
-        exclude_spec = PathSpec.from_lines(
-            "gitwildmatch", self.config.exclude_files + [tmp_dir_in_build_ctx.as_posix()]
-        )
-
-        def split(curr_dir: Path) -> t.Tuple[t.List[Path], t.List[Path]]:
-            large_files, small_files = [], []
-            for path in curr_dir.iterdir():
-                if not include_spec.match_file(path.as_posix()) or exclude_spec.match_file(
-                    path.as_posix()
-                ):
-                    continue
-
-                if path.is_dir():
-                    ret = split(path)
-                    large_files.extend(ret[0])
-                    small_files.extend(ret[1])
-                elif not path.is_symlink():
-                    size = path.stat().st_size
-                    if size > LARGE_FILE_THRESHOLD:
-                        large_files.append(path)
-                    else:
-                        small_files.append(path)
-
-            if len(large_files) == 0:
-                return [], [curr_dir]
-
-            return large_files, small_files
-
-        large_files, small_files = split(curr_dir)
-        large_files = sorted(
-            large_files,
-            key=lambda path: (_get_size_of_copy_target(path), path.name),
-            reverse=True,
-        )
-        small_files = sorted(
-            small_files,
-            key=lambda path: (_get_size_of_copy_target(path), path.name),
-            reverse=True,
-        )
-        return large_files, small_files
 
     @classmethod
     @abc.abstractmethod
     def python_entrypoint(cls) -> str:
         pass
-
-
-def _get_size_of_copy_target(path: Path):
-    if path.is_dir():
-        size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
-    elif not path.is_symlink():
-        size = path.stat().st_size
-    return size

@@ -14,11 +14,11 @@ class Input(BaseIO):
     )
     delay: int = Option(1, description="Delay in seconds", ge=1, le=60.0)
     failure: bool = Option(False)
-    # empty: str = Option("")
-    # nullable: Optional[str] = Option(None)
-    # nullable2: str | None = Option(None)
-    # optional_image: Optional[Image] = Option(None)
-    # optinaal_image2: Image | None = Option(None)
+    empty: str = Option("")
+    nullable: Optional[str] = Option(None)
+    nullable2: str | None = Option(None)
+    optional_image: Optional[Image] = Option(None)
+    optinaal_image2: Image | None = Option(None)
 
 
 class Output(BaseIO):
@@ -37,6 +37,7 @@ class DemoOutput(Output):
     readme_md="README.md",
     gpu=False,
     python_packages=["pillow"],
+    python_version="3.11",
 )
 class ModelData:
     def setup(self):

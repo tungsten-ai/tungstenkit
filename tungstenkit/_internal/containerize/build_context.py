@@ -1,7 +1,8 @@
 import os
 import shutil
 import subprocess
-import tempfile
+
+# import tempfile
 import time
 import typing as t
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -19,12 +20,12 @@ from tungstenkit._internal import storables
 from tungstenkit._internal.configs import BuildConfig
 from tungstenkit._internal.constants import TUNGSTEN_DIR_IN_CONTAINER
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
-from tungstenkit._internal.utils.context import hide_traceback
-from tungstenkit._internal.utils.docker_builder import create_files_image_tarball
-from tungstenkit._internal.utils.docker_client import (
-    load_docker_image_from_file,
-    remove_docker_image,
-)
+from tungstenkit._internal.utils.context import change_workingdir, hide_traceback
+
+# from tungstenkit._internal.utils.docker_client import (
+#     load_docker_image_from_file,
+#     remove_docker_image,
+# )
 from tungstenkit._internal.utils.file import (
     format_file_size,
     get_tree_size_in_bytes,
@@ -32,6 +33,9 @@ from tungstenkit._internal.utils.file import (
 )
 
 from .dockerfiles import BaseDockerfile
+
+# from tungstenkit._internal.utils.docker_builder import create_files_image_tarball
+
 
 TMP_DIR_NAME = ".tungsten-build"
 LARGE_FILE_THRESHOLD = 100 * 1024**2  # 100MB
@@ -92,23 +96,24 @@ class BuildContext:
                     size=size,
                 )
 
-    def build(self, tags: t.List[str]) -> None:
+    def build(self, tag: str) -> None:
         subprocess_args = [
             "docker",
+            "buildx",
             "build",
+            f"--tag={tag}",
+            "--cache-to=type=inline",
             "--file=" + str(self.dockerfile_path.relative_to(self.root_dir)),
+            "--output=type=docker,compression=zstd,force-compression=true,push=false",
         ]
-        for tag in tags:
-            subprocess_args.append(f"--tag={tag}")
         subprocess_args.append(str(self.root_dir))
         log_debug(msg="$ " + " ".join(subprocess_args), pretty=False)
         res = subprocess.run(subprocess_args, check=False, env={"DOCKER_BUILDKIT": "1"})
 
         if res.returncode != 0:
             with hide_traceback():
-                tags_str = ", ".join(tags)
                 raise exceptions.BuildError(
-                    f"Failed to build {tags_str}. For the reason, refer to above build logs."
+                    f"Failed to build {tag}. For the reason, refer to above build logs."
                 )
 
 
@@ -150,73 +155,74 @@ def setup_build_ctx(
 
         with FileLock(lock_path):
             with ThreadPoolExecutor(max_workers=8) as executor:
-                with _large_files_image(
-                    build_dir, build_config.include_files, build_config.exclude_files
-                ) as (
-                    large_file_rel_paths,
-                    large_files_image_name,
-                ):
-                    # TODO handle the case where copy_files include large files
+                # with _large_files_image(
+                #     build_dir, build_config.include_files, build_config.exclude_files
+                # ) as (
+                #     large_file_rel_paths,
+                #     large_files_image_name,
+                # ):
+                # TODO handle the case where copy_files include large files
 
-                    rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
-                    future_list: t.List[Future] = []
+                rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
+                future_list: t.List[Future] = []
 
-                    build_config.copy_files.extend(
-                        _convert_abs_symlinks_to_rel(
-                            build_dir,
-                            include_patterns=build_config.include_files,
-                            exclude_patterns=build_config.exclude_files,
-                            rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                        )
-                    )
-                    if build_config.copy_files:
-                        build_config.copy_files = _copy_files(
-                            abs_path_to_build_dir=build_dir,
-                            rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                            include_with_dest=build_config.copy_files,
-                            executor=executor,
-                            future_list=future_list,
-                        )
-                        _show_progress_while_copying_files(
-                            copy_dir=rel_path_to_tmp_dir,
-                            future_list=future_list,
-                            ignore_patterns=["tungstenkit"],
-                        )
-
-                    dockerfile = dockerfile_generator.generate(
-                        tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
-                        large_files_image_name=large_files_image_name,
-                        large_file_rel_paths=large_file_rel_paths,
-                    )
-                    dockerfile_path = build_dir / rel_path_to_dockerfile
-                    dockerfile_path.write_text(dockerfile)
-                    log_debug(
-                        "Dockerfile:\n"
-                        + "\n".join(
-                            ["  " + line for line in dockerfile.strip().split("\n") if line]
-                        ),
-                        pretty=False,
-                    )
-
-                    dockerignore_lines = _get_dockerignore_lines(
+                build_config.copy_files.extend(
+                    _convert_abs_symlinks_to_rel(
                         build_dir,
-                        build_config.include_files,
-                        build_config.exclude_files,
+                        include_patterns=build_config.include_files,
+                        exclude_patterns=build_config.exclude_files,
+                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
                     )
-                    log_debug("")
-                    log_debug(".dockerignore:\n" + "\n".join(dockerignore_lines))
-                    dockerignore_path = Path(str(dockerfile_path) + ".dockerignore")
-                    with dockerignore_path.open("w") as f:
-                        for line in dockerignore_lines:
-                            f.write(line + "\n")
-                    log_debug(f"Saved .dockerignore at {dockerignore_path}")
-                    log_debug("")
+                )
+                if build_config.copy_files:
+                    build_config.copy_files = _copy_files(
+                        abs_path_to_build_dir=build_dir,
+                        rel_path_to_tmp_dir=rel_path_to_tmp_dir,
+                        include_with_dest=build_config.copy_files,
+                        executor=executor,
+                        future_list=future_list,
+                    )
+                    _show_progress_while_copying_files(
+                        copy_dir=rel_path_to_tmp_dir,
+                        future_list=future_list,
+                        ignore_patterns=["tungstenkit"],
+                    )
 
-                    yield BuildContext(
-                        config=build_config,
-                        root_dir=build_dir,
-                        dockerfile_path=dockerfile_path,
-                    )
+                dockerfile = dockerfile_generator.generate(
+                    tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
+                    # large_files_image_name=large_files_image_name,
+                    # large_file_rel_paths=large_file_rel_paths,
+                )
+                dockerfile_path = build_dir / rel_path_to_dockerfile
+                dockerfile_path.write_text(dockerfile)
+                log_debug(
+                    "Dockerfile:\n"
+                    + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
+                    pretty=False,
+                )
+
+                dockerignore_lines = _get_dockerignore_lines(
+                    build_dir,
+                    build_config.include_files,
+                    build_config.exclude_files,
+                )
+                log_debug("")
+                log_debug(
+                    ".dockerignore:\n" + "\n".join([" " + line for line in dockerignore_lines]),
+                    pretty=False,
+                )
+                dockerignore_path = Path(str(dockerfile_path) + ".dockerignore")
+                with dockerignore_path.open("w") as f:
+                    for line in dockerignore_lines:
+                        f.write(line + "\n")
+                log_debug(f"Saved .dockerignore at {dockerignore_path}")
+                log_debug("")
+
+                yield BuildContext(
+                    config=build_config,
+                    root_dir=build_dir,
+                    dockerfile_path=dockerfile_path,
+                )
     finally:
         shutil.rmtree(rel_path_to_tmp_dir)
 
@@ -359,23 +365,23 @@ def _show_progress_while_copying_files(
     log_info("")
 
 
-def _get_large_file_rel_paths(
-    abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
-):
-    include_spec = PathSpec.from_lines("gitwildmatch", include_files)
-    exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_files + [TMP_DIR_NAME + "*/"])
-    candidates = list(
-        p.relative_to(abs_path_to_build_dir)
-        for p in abs_path_to_build_dir.rglob("*")
-        if p.stat().st_size > LARGE_FILE_THRESHOLD
-    )
-    return list(
-        p
-        for p in candidates
-        if p.stat().st_size > LARGE_FILE_THRESHOLD
-        and include_spec.match_file(p)
-        and not exclude_spec.match_file(p)
-    )
+# def _get_large_file_rel_paths(
+#     abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
+# ):
+#     include_spec = PathSpec.from_lines("gitwildmatch", include_files)
+#     exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_files + [TMP_DIR_NAME + "*/"])
+#     candidates = list(
+#         p.relative_to(abs_path_to_build_dir)
+#         for p in abs_path_to_build_dir.rglob("*")
+#         if p.stat().st_size > LARGE_FILE_THRESHOLD
+#     )
+#     return list(
+#         p
+#         for p in candidates
+#         if p.stat().st_size > LARGE_FILE_THRESHOLD
+#         and include_spec.match_file(p)
+#         and not exclude_spec.match_file(p)
+#     )
 
 
 def _get_dockerignore_lines(
@@ -386,10 +392,11 @@ def _get_dockerignore_lines(
     if len(include_files) == 0:
         return [""]
 
-    dockerignore_lines = [
-        p.as_posix()
-        for p in _get_large_file_rel_paths(abs_path_to_build_dir, include_files, exclude_files)
-    ]
+    # dockerignore_lines = [
+    #     p.as_posix()
+    #     for p in _get_large_file_rel_paths(abs_path_to_build_dir, include_files, exclude_files)
+    # ]
+    dockerignore_lines = []
 
     include_spec = PathSpec.from_lines("gitwildmatch", include_files)
     exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_files)
@@ -403,52 +410,64 @@ def _get_dockerignore_lines(
 
             rel_path_posix_str = rel_path.as_posix()
 
-            is_added = False
-            if not include_spec.match_file(rel_path_posix_str) or exclude_spec.match_file(
-                rel_path_posix_str
-            ):
-                dockerignore_lines.append(rel_path_posix_str)
-                is_added = True
-
-            if not is_added and rel_path.is_dir():
-                add(abs_path)
+            if abs_path.is_dir():
+                if not (
+                    (
+                        include_spec.match_file(rel_path_posix_str)
+                        and not exclude_spec.match_file(rel_path_posix_str)
+                    )
+                    or any(
+                        PathSpec.from_lines("gitwildmatch", [rel_path_posix_str]).match_file(
+                            pattern
+                        )
+                        for pattern in include_files
+                    )
+                ):
+                    dockerignore_lines.append(rel_path_posix_str)
+                else:
+                    add(abs_path)
+            else:
+                if not include_spec.match_file(rel_path_posix_str) or exclude_spec.match_file(
+                    rel_path_posix_str
+                ):
+                    dockerignore_lines.append(rel_path_posix_str)
 
     add(abs_path_to_build_dir)
 
     return dockerignore_lines
 
 
-@contextmanager
-def _large_files_image(
-    abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
-):
-    large_file_rel_paths = _get_large_file_rel_paths(
-        abs_path_to_build_dir, include_files, exclude_files
-    )
-    if len(large_file_rel_paths) > 0:
-        log_info("Create image with large files:")
-        for large_file_rel_path in large_file_rel_paths:
-            log_info(f" - {large_file_rel_path}")
+# @contextmanager
+# def _large_files_image(
+#     abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
+# ):
+#     large_file_rel_paths = _get_large_file_rel_paths(
+#         abs_path_to_build_dir, include_files, exclude_files
+#     )
+#     if len(large_file_rel_paths) > 0:
+#         log_info("Create image with large files:")
+#         for large_file_rel_path in large_file_rel_paths:
+#             log_info(f" - {large_file_rel_path}")
 
-        with tempfile.TemporaryDirectory(prefix="tungsten-build-") as tmpdir_str:
-            large_files_image_name = "tungsten-lf-" + uuid4().hex[:7] + ":" + uuid4().hex[:7]
-            large_files_image_tar_path = Path(tmpdir_str) / "large-files-image.tar"
-            log_info("")
-            create_files_image_tarball(
-                large_files_image_name,
-                [abs_path_to_build_dir / p for p in large_file_rel_paths],
-                large_files_image_tar_path,
-                abs_path_to_build_dir,
-            )
+#         with tempfile.TemporaryDirectory(prefix="tungsten-build-") as tmpdir_str:
+#             large_files_image_name = "tungsten-lf-" + uuid4().hex[:7] + ":" + uuid4().hex[:7]
+#             large_files_image_tar_path = Path(tmpdir_str) / "large-files-image.tar"
+#             log_info("")
+#             create_files_image_tarball(
+#                 large_files_image_name,
+#                 [abs_path_to_build_dir / p for p in large_file_rel_paths],
+#                 large_files_image_tar_path,
+#                 abs_path_to_build_dir,
+#             )
 
-            log_info("")
+#             log_info("")
 
-            log_info("Importing the image to docker")
-            load_docker_image_from_file(large_files_image_tar_path)
-            log_info("")
-            try:
-                yield (large_file_rel_paths, large_files_image_name)
-            finally:
-                remove_docker_image(large_files_image_name)
-    else:
-        yield ([], None)
+#             log_info("Importing the image to docker")
+#             load_docker_image_from_file(large_files_image_tar_path)
+#             log_info("")
+#             try:
+#                 yield (large_file_rel_paths, large_files_image_name)
+#             finally:
+#                 remove_docker_image(large_files_image_name)
+#     else:
+#         yield ([], None)

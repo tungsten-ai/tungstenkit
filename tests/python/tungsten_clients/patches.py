@@ -126,7 +126,7 @@ def patch_model_avatar_file_get_resp():
 
 @contextmanager
 def patch_dummy_model_data_in_image(dummy_model_data: storables.ModelData):
-    model_data_in_image = storables.model_data._ModelDataInImage(
+    model_data_in_image = storables.model._ModelDataInImage(
         module_name=dummy_model_data.module_name,
         class_name=dummy_model_data.class_name,
         docker_image_id=dummy_model_data.docker_image_id,
@@ -135,6 +135,6 @@ def patch_dummy_model_data_in_image(dummy_model_data: storables.ModelData):
         gpu_mem_gb=dummy_model_data.gpu_mem_gb,
     )
     with patch.object(
-        storables.model_data._ModelDataInImage, "from_image", return_value=model_data_in_image
+        storables.model._ModelDataInImage, "from_image", return_value=model_data_in_image
     ):
         yield

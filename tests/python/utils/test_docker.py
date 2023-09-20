@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tungstenkit._internal.utils.docker import copy_from_image
+from tungstenkit._internal.utils.docker_client import copy_from_image
 from tungstenkit.exceptions import DockerError
 
 from .fixtures.docker import DummyFSImage
