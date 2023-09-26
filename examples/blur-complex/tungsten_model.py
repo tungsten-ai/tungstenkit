@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple
 
 from PIL import ImageFilter
 
-from tungstenkit import BaseIO, Field, Image, Option, define_model
+from tungstenkit import BaseIO, Binary, Field, Image, Option, define_model
 
 
 class Input(BaseIO):
@@ -18,7 +18,8 @@ class Input(BaseIO):
     nullable: Optional[str] = Option(None)
     nullable2: str | None = Option(None)
     optional_image: Optional[Image] = Option(None)
-    optinaal_image2: Image | None = Option(None)
+    optional_image2: Image | None = Option(None)
+    optional_binary: Optional[Binary] = Option(None)
 
 
 class Output(BaseIO):
@@ -45,6 +46,9 @@ class ModelData:
         pass
 
     def predict(self, inputs: List[Input]) -> List[Output]:
+        print("Image paths:")
+        for inp in inputs:
+            print(inp.image.path)
         images = [inp.image.to_pil_image() for inp in inputs]
         converted = []
         for img in images:
@@ -52,6 +56,9 @@ class ModelData:
         return [Output(blurred=[Image.from_pil_image(img)]) for img in images]
 
     def predict_demo(self, inputs: List[Input]) -> Tuple[List[Output], List[Dict]]:
+        print("Image paths:")
+        for inp in inputs:
+            print(inp.image.path)
         opt = inputs[0]
         pil_images = [inp.image.to_pil_image() for inp in inputs]
         for i, pil_img in enumerate(pil_images):

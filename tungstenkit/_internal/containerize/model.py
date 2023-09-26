@@ -71,7 +71,7 @@ def build_model(
                     readme = None
 
                 model_data = storables.ModelData(
-                    name=name,
+                    name=model_name,
                     io_data=io_schema,
                     avatar=avatar,
                     readme=readme,
