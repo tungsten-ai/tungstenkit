@@ -107,6 +107,71 @@ def define_model(
     dockerfile_commands: t.Optional[t.List[str]] = None,
     base_image: t.Optional[str] = None,
 ):
+    r"""Returns a class decorator that sets the model configuration.
+
+    The base docker image, maybe a cuda image, and the python version can be inferred
+    for following pip packages:
+
+    ``torch``, ``torchvision``, ``torchaudio``, and ``tensorflow``.
+
+    While inferring, the runtime python version is preferred.
+
+    Args:
+        input (BaseIO): The input class.
+
+        output (BaseIO): The output class.
+
+        demo_output (BaseIO | None): The demo output class. It is required only when the ``predict_demo``
+        method is defined.
+
+        gpu: Indicates if the model requires GPUs.
+
+        python_packages (list[str] | None): A list of pip requirements in ``<name>[==<version>]``
+            format. If ``None`` (default), no python packages are added.
+
+        python_version (str | None): Python version to use in ``<major>[.<minor>[.<micro>]]``
+            format.
+            If ``None`` (default), the python version will be automatically determined
+            as compatible with pip packages while prefering the runtime python version.
+            Otherwise, fix the python version as ``python_version``.
+
+        system_packages (list[str] | None): A list of system packages, which are installed
+            by the system package manager (e.g. ``apt``). This argument will be ignored while
+            using a custom base image with which tungstenkit cannot decide which package manager to
+            use.
+
+        cuda_version (str | None): CUDA version in ``<major>[.<minor>[.<patch>]]`` format.
+            If ``None`` (default), the cuda version will be automatically determined as compatible
+            with pip packages. Otherwise, fix the CUDA version as ``cuda_version``. Raises
+            ValueError if ``gpu`` is ``False`` but ``cuda_version`` is not None.
+
+        readme_md (str | None): Path to the ``README.md`` file.
+
+        batch_size (int): Max batch size for adaptive batching.
+
+        gpu_mem_gb (int): Minimum GPU memory size required to run the model. This argument will be
+            ignored if ``gpu==False``.
+
+        mem_gb (int): Minimum memory size required to run the model.
+
+        include_files (list[str] | None): A list of patterns as in ``.gitignore``.
+            If ``None`` (default), all files in the working directory and its subdirectories
+            are added, which is equivalent to ``[*]``.
+
+        exclude_files (list[str] | None): A list of patterns as in ``.gitignore`` for matching
+            which files to exclude.
+            If ``None`` (default), all hidden files and Python bytecodes are ignored,
+            which is equivalent to ``[".*/", "__pycache__/", "*.pyc", "*.pyo", "*.pyd"]``.
+
+        dockerfile_commands (list[str] | None): A list of dockerfile commands. The commands will
+            be executed *before* setting up python packages.
+
+        base_image (str | None): Base docker image in ``<repository>[:<tag>]`` format.
+            If ``None`` (default), the base image is automatically selected with respect to
+            python packages, the gpu flag, and the CUDA version. Otherwise, use it as the base
+            image and ``system_packages`` will be ignored.
+    """
+
     kwargs = {key: value for key, value in locals().items() if key != "maybe_cls"}
 
     def wrap(cls_):
