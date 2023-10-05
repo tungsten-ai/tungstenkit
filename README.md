@@ -221,18 +221,10 @@ Tungstenkit supports both server-side and client-side batching.
 - **Client-side batching**  
     Also, you can reduce traffic volume by putting multiple inputs in a single prediction request:
     ```console
-    $ curl -X 'POST' 'http://localhost:3000/predict' \
+    $ curl -X 'POST' 'http://localhost:3000/predictions' \
       -H 'accept: application/json' \
       -H 'Content-Type: application/json' \
       -d '[{"field": "input1"}, {"field": "input2"}, {"field": "input3"}]'
-
-    {
-      "outputs": [
-        {"field": "output1"},
-        {"field": "output2"},
-        {"field": "output3"}
-      ]
-    }
     ```
 
 ## Prerequisites
