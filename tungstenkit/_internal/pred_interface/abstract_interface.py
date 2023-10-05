@@ -3,7 +3,6 @@ import typing as t
 from pathlib import Path
 
 from tungstenkit import exceptions
-from tungstenkit._internal.io import build_uri_for_file
 from tungstenkit._internal.model_clients import schemas
 from tungstenkit._internal.storables import ModelData
 from tungstenkit._internal.utils.file import copy_multiple_files
@@ -21,6 +20,9 @@ DEFAULT_OUTPUT_FILE_DIR = Path(".")
 class PredInterface(abc.ABC):
     _data: ModelData
     _default_output_file_dir: t.Optional[Path] = None
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + "(data=" + str(self._data) + ")"
 
     @t.overload
     def predict(
@@ -73,6 +75,16 @@ class PredInterface(abc.ABC):
     def _predict(self, inputs: t.List[t.Dict]) -> schemas.PredictionResponse:
         pass
 
+    @abc.abstractmethod
+    def _convert_input_files_to_urls(self, input: t.Dict) -> t.Dict:
+        """
+        Convert files in input dict to urls.
+
+        Supported types: ``str``, ``pathlib.Path``, ``tungstenkit._internal.io.File``,
+        ``io.BufferedIOBase``, ``io.TextIOBase``
+        """
+        pass
+
     def _cleanup_prediction(self):
         pass
 
@@ -95,20 +107,6 @@ class PredInterface(abc.ABC):
                 if not isinstance(key, str):
                     raise ValueError(f"expected input dictionary key is 'str', not '{type(key)}")
         return input_list
-
-    def _convert_input_files_to_urls(self, input: t.Dict) -> t.Dict:
-        """
-        Convert files in input dict to urls.
-
-        Supported types: ``str``, ``pathlib.Path``, ``tungstenkit._internal.io.File``,
-        ``io.BufferedIOBase``, ``io.TextIOBase``
-        """
-        ret = input.copy()
-        input_filetypes = self._data.io.input_filetypes
-        for field_name in input_filetypes.keys():
-            if field_name in ret:
-                ret[field_name] = build_uri_for_file(input[field_name])
-        return ret
 
     def _save_output_files(
         self, outputs: t.List[t.Dict], output_file_dir: t.Optional[Path] = None

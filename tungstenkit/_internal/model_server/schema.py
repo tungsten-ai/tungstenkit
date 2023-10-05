@@ -1,6 +1,6 @@
 import typing as t
 
-from pydantic import BaseModel, conlist, create_model
+from pydantic import BaseModel, Field, conlist, create_model
 from pydantic.typing import Annotated
 
 from tungstenkit._internal.io import BaseIO
@@ -46,6 +46,11 @@ class PredictionID(BaseModel):
     prediction_id: str
 
 
+class DemoID(BaseModel):
+    demo_id: str
+
+
 class Metadata(BaseModel):
     input_schema: t.Dict
     output_schema: t.Dict
+    demo_output_schema: t.Dict

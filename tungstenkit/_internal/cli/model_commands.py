@@ -182,7 +182,7 @@ def list_models(**kwargs):
 @common_options
 def tag(src: str, target: str, **kwargs):
     """
-    Rename a model
+    Add a new name of a model
     """
 
     m = model_store.get(src)

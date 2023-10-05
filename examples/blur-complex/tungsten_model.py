@@ -40,7 +40,7 @@ class DemoOutput(Output):
     python_packages=["pillow"],
     python_version="3.11",
 )
-class ModelData:
+class Model:
     def setup(self):
         print("setup")
         pass

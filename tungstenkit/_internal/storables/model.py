@@ -92,10 +92,12 @@ class StoredModelData(JSONItem):
     repo_name: str
     tag: str
 
-    io: StoredModelIOData
-    avatar: StoredAvatar
-    readme: t.Optional[StoredMarkdown] = None
-    source_files: t.Optional[SerializedSourceFileCollection] = None
+    io: StoredModelIOData = attrs.field(repr=False)
+    avatar: StoredAvatar = attrs.field(repr=False)
+    readme: t.Optional[StoredMarkdown] = attrs.field(default=None, repr=False)
+    source_files: t.Optional[SerializedSourceFileCollection] = attrs.field(
+        default=None, repr=False
+    )
 
     created_at: datetime = attrs.field(factory=datetime.utcnow)
 
@@ -140,10 +142,10 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
     repo_name: str
     tag: str
 
-    io: ModelIOData
-    avatar: AvatarData
-    readme: t.Optional[MarkdownData] = None
-    source_files: t.Optional[SourceFileCollection] = None
+    io: ModelIOData = attrs.field(repr=False)
+    avatar: AvatarData = attrs.field(repr=False)
+    readme: t.Optional[MarkdownData] = attrs.field(default=None, repr=False)
+    source_files: t.Optional[SourceFileCollection] = attrs.field(default=None, repr=False)
 
     _created_at: t.Optional[datetime] = attrs.field(default=None, alias="created_at")
 

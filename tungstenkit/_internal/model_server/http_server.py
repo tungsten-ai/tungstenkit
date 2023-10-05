@@ -41,6 +41,7 @@ def _add_endpoints(
     basic_info = schema.Metadata(
         input_schema=model_loader.input_class.schema(),
         output_schema=model_loader.output_class.schema(),
+        demo_output_schema=model_loader.demo_output_class.schema(),
     )
 
     PredictionRequest = schema.PredictionRequest.with_type(model_loader.input_class)
@@ -48,64 +49,6 @@ def _add_endpoints(
     DemoResponse = schema.DemoResponse.with_type(model_loader.output_class)
 
     # TODO define route class
-
-    def _predict_async(
-        req: PredictionRequest,  # type: ignore
-        *,
-        is_demo: bool,
-    ) -> schema.PredictionID:
-        try:
-            prediction_id = prediction_worker.create_prediction(
-                inputs=req.__root__,  # type: ignore
-                is_demo=is_demo,
-            )
-        except Exception as e:
-            logger.exception(e)
-            raise HTTPException(status_code=500)
-        return schema.PredictionID(prediction_id=prediction_id)
-
-    def _get_resp(
-        prediction_id: str,
-        resp_cls: t.Type[R],
-    ) -> R:
-        try:
-            result = prediction_worker.get_prediction_result(prediction_id)
-        except server_exceptions.PredictionIDNotFound as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        except Exception as e:
-            logger.exception(e)
-            raise HTTPException(status_code=500)
-
-        if issubclass(resp_cls, DemoResponse):
-            return DemoResponse(
-                outputs=result.outputs,  # type: ignore
-                status=result.status,
-                error_message=result.error_message,
-                demo_outputs=result.demo_outputs,
-                logs=result.logs,
-            )
-        else:
-            return resp_cls(
-                outputs=result.outputs,  # type: ignore
-                status=result.status,
-                error_message=result.error_message,
-            )
-
-    def _predict_sync(
-        req: PredictionRequest,  # type: ignore
-        output_cls: t.Type[R],
-        *,
-        demo: bool,
-    ) -> R:
-        async_resp = _predict_async(req, is_demo=demo)
-        try:
-            prediction_worker.wait_for_prediction(async_resp.prediction_id)
-        except Exception as e:
-            logger.exception(e)
-            raise HTTPException(status_code=500)
-        resp = _get_resp(async_resp.prediction_id, output_cls)
-        prediction_worker.remove_prediction_result(async_resp.prediction_id)
-        return resp
 
     def cancel(prediction_id: str) -> Response:
         try:
@@ -126,42 +69,126 @@ def _add_endpoints(
         response_model=PredictionResponse,
     )
     def predict_synchronously(req: PredictionRequest):  # type: ignore
-        return _predict_sync(req, PredictionResponse, demo=False)
+        try:
+            prediction_id = prediction_worker.create_prediction(
+                inputs=req.__root__, is_demo=False  # type: ignore
+            )
+        except Exception as e:
+            logger.exception(e)
+            raise HTTPException(status_code=500)
 
-    @app.post("/predict_async", response_model=schema.PredictionID)
+        async_resp = schema.PredictionID(prediction_id=prediction_id)
+
+        try:
+            try:
+                prediction_worker.wait_for_prediction(async_resp.prediction_id)
+            except Exception as e:
+                logger.exception(e)
+                raise HTTPException(status_code=500)
+            try:
+                result = prediction_worker.get_prediction_result(prediction_id)
+            except server_exceptions.PredictionIDNotFound as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                logger.exception(e)
+                raise HTTPException(status_code=500)
+
+            resp = PredictionResponse(
+                outputs=result.outputs,  # type: ignore
+                status=result.status,
+                error_message=result.error_message,
+            )
+
+        finally:
+            try:
+                cancel(async_resp.prediction_id)
+            except Exception:
+                pass
+
+            try:
+                prediction_worker.remove_prediction_result(async_resp.prediction_id)
+            except Exception:
+                pass
+
+        return resp
+
+    @app.post("/predictions", response_model=schema.PredictionID)
     def predict_asynchronously(req: PredictionRequest):  # type: ignore
-        return _predict_async(req, is_demo=False)
+        try:
+            prediction_id = prediction_worker.create_prediction(
+                inputs=req.__root__,  # type: ignore
+                is_demo=False,
+            )
+        except Exception as e:
+            logger.exception(e)
+            raise HTTPException(status_code=500)
+
+        return schema.PredictionID(prediction_id=prediction_id)
 
     @app.get(
-        "/predict_async/{prediction_id}",
+        "/predictions/{prediction_id}",
         response_model=PredictionResponse,
     )
     def get_prediction_result(prediction_id: str):
-        return _get_resp(prediction_id, PredictionResponse)
+        try:
+            result = prediction_worker.get_prediction_result(prediction_id)
+        except server_exceptions.PredictionIDNotFound as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            logger.exception(e)
+            raise HTTPException(status_code=500)
 
-    @app.post("/predict_async/{prediction_id}/cancel")
+        return PredictionResponse(
+            outputs=result.outputs,  # type: ignore
+            status=result.status,
+            error_message=result.error_message,
+        )
+
+    @app.post("/predictions/{prediction_id}/cancel")
     def cancel_prediction(prediction_id: str):
         return cancel(prediction_id)
 
     @app.post(
         "/demo",
-        response_model=schema.PredictionID,
+        response_model=schema.DemoID,
     )
     def request_demo(req: PredictionRequest):  # type: ignore
-        return _predict_async(req, is_demo=True)
+        try:
+            demo_id = prediction_worker.create_prediction(
+                inputs=req.__root__,  # type: ignore
+                is_demo=True,
+            )
+        except Exception as e:
+            logger.exception(e)
+            raise HTTPException(status_code=500)
+        return schema.DemoID(demo_id=demo_id)
 
     @app.get(
-        "/demo/{prediction_id}",
+        "/demo/{demo_id}",
         response_model=DemoResponse,
     )
-    def get_demo_result(prediction_id: str):
-        return _get_resp(prediction_id, DemoResponse)
+    def get_demo_result(demo_id: str):
+        try:
+            result = prediction_worker.get_prediction_result(demo_id)
+        except server_exceptions.PredictionIDNotFound as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            logger.exception(e)
+            raise HTTPException(status_code=500)
+
+        return DemoResponse(
+            outputs=result.outputs,  # type: ignore
+            status=result.status,
+            error_message=result.error_message,
+            demo_outputs=result.demo_outputs,
+            logs=result.logs,
+        )
 
     @app.post(
-        "/demo/{prediction_id}/cancel",
+        "/demo/{demo_id}/cancel",
     )
-    def cancel_demo(prediction_id: str):
-        return cancel(prediction_id)
+    def cancel_demo(demo_id: str):
+        return cancel(demo_id)
 
 
 def _setup_openapi(app: FastAPI):

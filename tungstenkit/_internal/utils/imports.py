@@ -20,7 +20,7 @@ def _raise_module_cannot_be_loaded(exc_msg):
 
     # Re-raise after manipulating traceback
     except ImportError:
-        tb = sys.exc_info()[2]
+        tb = sys.exc_info()[1]
         back_frame = tb.tb_frame.f_back.f_back
 
     back_tb = types.TracebackType(
@@ -103,7 +103,8 @@ class UnknownModuleLazyLoader(importlib.abc.Loader):
         dot_separated = fullname.split(".")
         for i in range(len(dot_separated)):
             name = ".".join(dot_separated[: i + 1])
-            self._registered[name] = UnknownModule(name, self._help_msg_on_err)
+            if name not in self._registered:
+                self._registered[name] = UnknownModule(name, self._help_msg_on_err)
         if fullname in self._registered and module_attr:
             self._registered[fullname]._add(module_attr)
 
@@ -166,7 +167,15 @@ def lazy_import_ctx(imports: List[Import], help_msg_on_err: Optional[str] = None
         sys.meta_path.insert(0, finder)
         for imp in imports:
             try:
-                importlib.import_module(".".join(imp.module) if imp.module else ".".join(imp.name))
+                mod = importlib.import_module(
+                    ".".join(imp.module) if imp.module else ".".join(imp.name)
+                )
+                if isinstance(mod, UnknownModule):
+                    if imp.module:
+                        attr_name = ".".join(imp.name)
+                        loader.register(".".join(imp.module), attr_name if attr_name else None)
+                    else:
+                        loader.register(".".join(imp.name))
             except Exception:
                 if imp.module:
                     attr_name = ".".join(imp.name)

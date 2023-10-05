@@ -42,25 +42,46 @@ class ModelAPIClient:
 
     def create_prediction(self, inputs: t.Sequence[t.Union[t.Dict, BaseIO]]) -> str:
         f = furl(self.base_url)
-        f.path = f.path / "predict_async"
+        f.path = f.path / "predictions"
         r = self._post_prediction(url=f.url, inputs=inputs)
+        if r.status_code == 404 or r.status_code == 405:
+            print(r.status_code)
+            # legacy api
+            f = furl(self.base_url)
+            f.path = f.path / "predict_async"
+            r = self._post_prediction(url=f.url, inputs=inputs)
+
         self._check_resp(r, f.url, self.create_prediction)
         parsed = schemas.PredictionID.parse_raw(r.text)
         return parsed.prediction_id
 
     def get_prediction(self, prediction_id: str) -> schemas.PredictionResponse:
         f = furl(self.base_url)
-        f.path = f.path / "predict_async" / prediction_id
+        f.path = f.path / "predictions" / prediction_id
         log_request(url=f.url, method="GET")
         r = self.sess.get(url=f.url, timeout=CONNECTION_TIMEOUT)
+        if r.status_code == 404 or r.status_code == 405:
+            # legacy api
+            f = furl(self.base_url)
+            f.path = f.path / "predict_async" / prediction_id
+            log_request(url=f.url, method="GET")
+            r = self.sess.get(url=f.url, timeout=CONNECTION_TIMEOUT)
+
         self._check_resp(r, f.url, self.get_prediction)
         return schemas.PredictionResponse.parse_raw(r.text)
 
     def cancel_prediction(self, prediction_id: str) -> None:
         f = furl(self.base_url)
-        f.path = f.path / "predict_async" / prediction_id / "cancel"
+        f.path = f.path / "predictions" / prediction_id / "cancel"
         log_request(url=f.url, method="POST")
         r = self.sess.post(url=f.url, timeout=CONNECTION_TIMEOUT)
+        if r.status_code == 404 or r.status_code == 405:
+            # legacy api
+            f = furl(self.base_url)
+            f.path = f.path / "predict_async" / prediction_id / "cancel"
+            log_request(url=f.url, method="POST")
+            r = self.sess.post(url=f.url, timeout=CONNECTION_TIMEOUT)
+
         self._check_resp(r, f.url, self.cancel_prediction)
 
     def create_demo(self, inputs: t.Sequence[t.Union[t.Dict, BaseIO]]) -> str:
@@ -68,20 +89,20 @@ class ModelAPIClient:
         f.path = f.path / "demo"
         r = self._post_prediction(url=f.url, inputs=inputs)
         self._check_resp(r, f.url, self.create_demo)
-        parsed = schemas.PredictionID.parse_raw(r.text)
-        return parsed.prediction_id
+        parsed = schemas.DemoID.parse_raw(r.text)
+        return parsed.demo_id
 
-    def get_demo(self, prediction_id: str) -> schemas.DemoResponse:
+    def get_demo(self, demo_id: str) -> schemas.DemoResponse:
         f = furl(self.base_url)
-        f.path = f.path / "demo" / prediction_id
+        f.path = f.path / "demo" / demo_id
         log_request(url=f.url, method="GET")
         r = self.sess.get(url=f.url, timeout=CONNECTION_TIMEOUT)
         self._check_resp(r, f.url, self.get_demo)
         return schemas.DemoResponse.parse_raw(r.text)
 
-    def cancel_demo(self, prediction_id: str) -> None:
+    def cancel_demo(self, demo_id: str) -> None:
         f = furl(self.base_url)
-        f.path = f.path / "demo" / prediction_id / "cancel"
+        f.path = f.path / "demo" / demo_id / "cancel"
         log_request(url=f.url, method="POST")
         r = self.sess.post(url=f.url, timeout=CONNECTION_TIMEOUT)
         self._check_resp(r, f.url, self.cancel_demo)

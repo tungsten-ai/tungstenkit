@@ -107,7 +107,8 @@ def _add_api_endpoints(
     @app.post("/predictions", response_model=schemas.Prediction)
     def create_prediction(body: schemas.PostPredictionRequest, req: Request):
         prediction_id = prediction_service.create_prediction(input=body.__root__)
-        return prediction_service.get_prediction_by_id(prediction_id, req)
+        pred = prediction_service.get_prediction_by_id(prediction_id, req)
+        return pred
 
     @app.get("/predictions/{prediction_id}", response_model=schemas.Prediction)
     def get_prediction(prediction_id: str, req: Request):

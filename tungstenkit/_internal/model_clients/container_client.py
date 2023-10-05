@@ -59,9 +59,9 @@ class ModelContainerClient:
             inputs, move=self._rename_files
         )
         files.extend(files_in_inputs)
-        prediction_id = self._api.create_demo(inputs)
+        demo_id = self._api.create_demo(inputs)
         while True:
-            result = self._api.get_demo(prediction_id)
+            result = self._api.get_demo(demo_id)
             if result.status == "success" or result.status == "failed":
                 break
 
@@ -86,8 +86,8 @@ class ModelContainerClient:
         )
         return self._api.create_demo(inputs), files
 
-    def get_demo(self, prediction_id: str) -> t.Tuple[schemas.DemoResponse, t.List[Path]]:
-        result = self._api.get_demo(prediction_id=prediction_id)
+    def get_demo(self, demo_id: str) -> t.Tuple[schemas.DemoResponse, t.List[Path]]:
+        result = self._api.get_demo(demo_id=demo_id)
         files: t.List[Path] = []
         if result.outputs:
             result.outputs, files_in_outputs = self._container.convert_file_uris_in_outputs(
