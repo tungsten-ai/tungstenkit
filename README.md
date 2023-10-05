@@ -4,7 +4,7 @@
 [![Downloads](https://static.pepy.tech/badge/tungstenkit?style=flat-square)](https://pypi.org/project/tungstenkit/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/tungstenkit.svg?color=%2334D058)](https://pypi.org/project/tungstenkit/)
 
-[Introduction](#tungstenkit-ml-container-made-simple) | [Installation](#prerequisites) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
+[Introduction](#tungstenkit-ml-container-made-simple) | [Installation](#prerequisites) | [Documentation](#documentation) | [Community](#join-our-community)
 
 **Tungstenkit** is ML containerization tool with a focus on developer productivity and versatility. 
 
@@ -246,4 +246,12 @@ pip install tungstenkit
 
 ## Documentation
 - [Getting Started](https://tungsten-ai.github.io/docs/getting_started)
-- [Usage](https://tungsten-ai.github.io/docs/usage/use_gpus)
+- [Building Your Model](https://tungsten-ai.github.io/docs/building_your_model/model_definition/)
+- [Running Models](https://tungsten-ai.github.io/docs/running_models/using_gpus/)
+- [Pushing and Pulling Models](https://tungsten-ai.github.io/docs/pushing_and_pulling_models/pushing/)
+- [CLI Reference](https://tungsten-ai.github.io/docs/cli_reference/)
+- [REST API Reference](https://tungsten-ai.github.io/docs/rest_api_reference/)
+- [Examples](https://tungsten-ai.github.io/docs/examples/image_blurring/)
+
+## Join our community
+[Tungsten](https://tungsten.run) is where you can run, share and discuss AI. Currently we are in beta - things can be slow or even break. If you like what we are building, join our [discord server](https://discord.com/invite/NESFeXzFuy)!
