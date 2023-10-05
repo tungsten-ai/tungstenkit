@@ -246,4 +246,4 @@ pip install tungstenkit
 - [Examples](https://tungsten-ai.github.io/docs/examples/image_blurring/)
 
 ## Join our community
-[Tungsten](https://tungsten.run) is where you can run, share and discuss AI. Currently we are in beta - things can be slow or even break. If you like what we are building, join our [discord server](https://discord.com/invite/NESFeXzFuy)!
+If you have questions about anything related to Tungstenkit, you're always welcome to ask our community on [Discord](https://discord.gg/NESFeXzFuy).
