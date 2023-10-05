@@ -237,7 +237,7 @@ pip install tungstenkit
 ```
 
 ## Documentation
-- [Getting Started](https://tungsten-ai.github.io/docs/getting_started)
+- [Getting Started](https://tungsten-ai.github.io/docs/getting_started/installation/)
 - [Building Your Model](https://tungsten-ai.github.io/docs/building_your_model/model_definition/)
 - [Running Models](https://tungsten-ai.github.io/docs/running_models/using_gpus/)
 - [Pushing and Pulling Models](https://tungsten-ai.github.io/docs/pushing_and_pulling_models/pushing/)
