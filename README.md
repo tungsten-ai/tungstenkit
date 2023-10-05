@@ -6,10 +6,17 @@
 
 [Introduction](#tungstenkit-ml-container-made-simple) | [Installation](#prerequisites) | [Getting Started](https://tungsten-ai.github.io/docs/getting_started) | [Documentation](https://tungsten-ai.github.io/docs) 
 
-Tungstenkit is ML containerization tool with a focus on developer productivity and versatility.
+**Tungstenkit** is ML containerization tool with a focus on developer productivity and versatility. 
 
-The key features are:
+Have you ever struggled to use models from github?
+You may have repeated tedious steps like: cuda/dependency problems, file handling, and scripting for testing.
 
+Standing on the shoulder of Docker, this project aims to make using ML models less painful by adding functionalities for typical use cases - REST API server, GUI, CLI, and Python script.
+
+With Tungstenkit, sharing and consuming ML models can be quick and enjoyable.
+
+
+## Features
 - [Requires only a few lines of Python code](#requires-only-a-few-lines-of-python-code)
 - [Build once, use everywhere](#build-once-use-everywhere):
     - [REST API server](#rest-api-server)
@@ -17,9 +24,9 @@ The key features are:
     - [CLI application](#cli-application)
     - [Python function](#python-function)
 - [Framework-agnostic and lightweight](#framework-agnostic-and-lightweight)
-- [Batched prediction](#batched-prediction)
 - [Pydantic input/output definitions with convenient file handling](#pydantic-inputoutput-definitions-with-convenient-file-handling)
-- Clustering with distributed machines (coming soon)
+- [Supports batched prediction](#supports-batched-prediction)
+- Supports clustering with distributed machines (coming soon)
 
 ## Take the tour
 ### Requires only a few lines of python code
@@ -45,7 +52,7 @@ class Output(BaseIO):
     gpu=True,
     python_packages=["torch", "torchvision"],
     batch_size=4,
-    gpu_mem_gb=24,
+    gpu_mem_gb=16,
 )
 class TextToImageModel:
     def setup(self):
@@ -65,7 +72,7 @@ Start a build process:
 ```console
 $ tungsten build . -n text-to-image
 
-✅ Successfully built tungsten model: 'text-to-image:e3a5de56' (also tagged as 'text-to-image:latest')
+✅ Successfully built tungsten model: 'text-to-image:e3a5de56'
 ```
 
 Check the built image:
@@ -93,15 +100,27 @@ INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
 Send a prediction request with a JSON payload:
 
 ```console
-$ curl -X 'POST' 'http://localhost:3000/predict' \
-  -H 'accept: application/json' \
+$ curl -X 'POST' 'http://localhost:3000/predictions' \
+  -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '[{"prompt": "a professional photograph of an astronaut riding a horse"}]'
 
 {
-    "outputs": [{"image": "data:image/png;base64,..."}]
+    "prediction_id": "39c9eb6b"
 }
 ```
+
+Get the result:
+```console
+$ curl -X 'GET' 'http://localhost:3000/predictions/39c9eb6b' \
+  -H 'Accept: application/json'
+
+{
+    "outputs": [{"image": "data:image/png;base64,..."}],
+    "status": "success"
+}
+```
+
 
 #### GUI application
 If you need a more user-friendly way to make predictions, start a GUI app with the following command:
@@ -141,45 +160,13 @@ Tungstenkit doesn't restrict you to use specific ML libraries. Just use any libr
 
 ```python
 # The latest cpu-only build of Tensorflow will be included
-@define_model(input=Input, output=Output, gpu=False, python_packages=["tensorflow"])
-class Model:
+@define_model(gpu=False, python_packages=["tensorflow"])
+class TensorflowModel:
     def predict(self, inputs):
         """Run a batch prediction"""
         # ...ops using tensorflow...
         return outputs
 ```
-
-### Batched prediction
-Tungstenkit supports both server-side and client-side batching.
-
-- **Server-side batching**  
-    <!-- Explain more? Mention hashing? -->
-    A server groups inputs across multiple requests and processes them together.
-    You can configure the max batch size:
-    ```python
-    @define_model(input=Input, output=Output, gpu=True, batch_size=32)
-    ```
-    The max batch size can be changed when running a server:
-    ```console
-    $ docker run -p 3000:3000 --gpus all model:latest --batch-size 64 
-    ```
-
-- **Client-side batching**  
-    Also, you can reduce traffic volume by putting multiple inputs in a single prediction request:
-    ```console
-    $ curl -X 'POST' 'http://localhost:3000/predict' \
-      -H 'accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -d '[{"field": "input1"}, {"field": "input2"}, {"field": "input3"}]'
-
-    {
-      "outputs": [
-        {"field": "output1"},
-        {"field": "output2"},
-        {"field": "output3"}
-      ]
-    }
-    ```
 
 ### Pydantic input/output definitions with convenient file handling
 Let's look at the example below:
@@ -216,12 +203,41 @@ class StyleTransferModel:
         return outputs
 ```
 
+### Supports batched prediction
+Tungstenkit supports both server-side and client-side batching.
+
+- **Server-side batching**  
+    <!-- Explain more? Mention hashing? -->
+    A server groups inputs across multiple requests and processes them together.
+    You can configure the max batch size:
+    ```python
+    @define_model(input=Input, output=Output, gpu=True, batch_size=32)
+    ```
+    The max batch size can be changed when running a server:
+    ```console
+    $ tungsten serve mymodel -p 3000 --batch-size 16
+    ```
+
+- **Client-side batching**  
+    Also, you can reduce traffic volume by putting multiple inputs in a single prediction request:
+    ```console
+    $ curl -X 'POST' 'http://localhost:3000/predict' \
+      -H 'accept: application/json' \
+      -H 'Content-Type: application/json' \
+      -d '[{"field": "input1"}, {"field": "input2"}, {"field": "input3"}]'
+
+    {
+      "outputs": [
+        {"field": "output1"},
+        {"field": "output2"},
+        {"field": "output3"}
+      ]
+    }
+    ```
+
 ## Prerequisites
 - Python 3.7+
 - [Docker](https://docs.docker.com/get-docker/)
-- (Optional) For using GPUs,
-    - Linux: [nvidia-container-runtime](https://docs.docker.com/config/containers/resource_constraints/#access-an-nvidia-gpu)
-    - Windows: [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/windows/wsl/#turn-on-docker-desktop-wsl-2)
 
 ## Installation
 ```shell
