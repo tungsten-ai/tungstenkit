@@ -63,8 +63,8 @@ def _default_exclude_files():
 # TODO more validators (e.g., include_files)
 class BuildConfig(BaseModel):
     gpu: bool = False
-    mem_gb: int = 8
-    gpu_mem_gb: int = 16
+    mem_gb: float = 8.0
+    gpu_mem_gb: float = 16.0
 
     python_packages: t.List[str] = Field(default_factory=list)
     include_files: t.List[str] = Field(default_factory=_default_include_files)

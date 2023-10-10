@@ -33,7 +33,7 @@ class _ModelDataInImage:
     docker_image_id: str
     batch_size: int
     device: str
-    gpu_mem_gb: t.Optional[int]
+    gpu_mem_gb: t.Optional[float]
 
     @property
     def gpu(self) -> bool:
@@ -72,7 +72,7 @@ class _ModelDataInImage:
                 if label_name == "device":
                     device = label_value
                 elif label_name == "gpu_mem_gb":
-                    gpu_mem_gb = int(label_value)
+                    gpu_mem_gb = float(label_value)
                     if device == "gpu" and gpu_mem_gb == 0:
                         gpu_mem_gb = DEFAULT_GPU_MEM_GB
 

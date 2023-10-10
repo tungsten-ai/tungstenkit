@@ -36,7 +36,7 @@ TUNGSTEN_LOGO = r"""
 
 DEFAULT_MODEL_MODULE = "tungsten_model"
 DEFAULT_TUNGSTEN_SERVER_URL = "https://api.tungsten.run"
-DEFAULT_GPU_MEM_GB = 16
+DEFAULT_GPU_MEM_GB = 16.0
 
 DATA_DIR = Path(
     os.getenv(

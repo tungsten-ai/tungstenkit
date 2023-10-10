@@ -4,6 +4,7 @@ import typing as t
 from typing_extensions import Protocol
 
 from tungstenkit import BaseIO
+from tungstenkit._internal.constants import DEFAULT_GPU_MEM_GB
 from tungstenkit._internal.io_schema import (
     validate_demo_output_class,
     validate_input_class,
@@ -49,8 +50,8 @@ def define_model(
     force_install_system_cuda: bool = False,
     readme_md: t.Optional[str] = None,
     batch_size: int = 1,
-    gpu_mem_gb: int = 16,
-    mem_gb: int = 8,
+    gpu_mem_gb: float = DEFAULT_GPU_MEM_GB,
+    mem_gb: float = 8.0,
     include_files: t.Optional[t.List[str]] = None,
     exclude_files: t.Optional[t.List[str]] = None,
     dockerfile_commands: t.Optional[t.List[str]] = None,
@@ -75,8 +76,8 @@ def define_model(
     force_install_system_cuda: bool = False,
     readme_md: t.Optional[str] = None,
     batch_size: int = 1,
-    gpu_mem_gb: int = 16,
-    mem_gb: int = 8,
+    gpu_mem_gb: float = DEFAULT_GPU_MEM_GB,
+    mem_gb: float = 8.0,
     include_files: t.Optional[t.List[str]] = None,
     exclude_files: t.Optional[t.List[str]] = None,
     dockerfile_commands: t.Optional[t.List[str]] = None,
@@ -100,8 +101,8 @@ def define_model(
     force_install_system_cuda: bool = False,
     readme_md: t.Optional[str] = None,
     batch_size: int = 1,
-    gpu_mem_gb: int = 16,
-    mem_gb: int = 8,
+    gpu_mem_gb: float = DEFAULT_GPU_MEM_GB,
+    mem_gb: float = 8.0,
     include_files: t.Optional[t.List[str]] = None,
     exclude_files: t.Optional[t.List[str]] = None,
     dockerfile_commands: t.Optional[t.List[str]] = None,

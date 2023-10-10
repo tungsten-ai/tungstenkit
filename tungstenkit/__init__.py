@@ -1,4 +1,13 @@
-from tungstenkit._internal.io import Audio, BaseIO, Binary, Field, Image, Option, Video
+from tungstenkit._internal.io import (
+    Audio,
+    BaseIO,
+    Binary,
+    Field,
+    Image,
+    MaskedImage,
+    Option,
+    Video,
+)
 from tungstenkit._internal.model_def import define_model
 from tungstenkit._internal.pred_interface import ModelServer
 
@@ -10,6 +19,7 @@ __all__ = [
     "Binary",
     "Field",
     "Image",
+    "MaskedImage",
     "Option",
     "Video",
     "define_model",

@@ -15,6 +15,7 @@ from furl import furl
 from PIL import Image as PILImage
 from pydantic import BaseModel
 from pydantic import Field as PydanticField
+from pydantic import validator
 from pydantic.fields import ModelField, Undefined
 from typing_extensions import Literal
 from w3lib.url import parse_data_uri
@@ -277,6 +278,19 @@ class BaseIO(BaseModel):
         validate_assignment = True
         validate_all = True
         arbitrary_types_allowed = True
+
+
+class MaskedImage(BaseIO):
+    image: Image
+    mask: Image
+
+    @validator("mask")
+    def validate_mask(cls, v: Image, values: t.Dict[str, Image]):
+        pil_mask = v.to_pil_image("L").point(lambda p: 255 if p > 0 else 0).convert("1")
+        pil_image = values["image"].to_pil_image()
+        if pil_mask.size != pil_image.size:
+            raise ValueError("Mask size is different to the image's")
+        return Image.from_pil_image(pil_mask)
 
 
 def filetype_to_cls(filetype: FileType) -> t.Type[File]:

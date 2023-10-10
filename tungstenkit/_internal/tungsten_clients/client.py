@@ -121,7 +121,9 @@ class TungstenClient:
                 input_filetypes=model.io.input_filetypes,
                 output_filetypes=model.io.output_filetypes,
                 demo_output_filetypes=model.io.demo_output_filetypes,
-                gpu_memory=model.gpu_mem_gb * 1024 * 1024 if model.gpu and model.gpu_mem_gb else 0,
+                gpu_memory=int(model.gpu_mem_gb * 10**9)
+                if model.gpu and model.gpu_mem_gb
+                else 0,
                 version=version,
                 # source_files=source_files,
                 # skipped_source_files=skipped_source_files,

@@ -171,6 +171,7 @@ class JSONStore(t.Generic[ItemType]):
                     raise exceptions.NotFound(self._build_not_found_err_msg(item.name))
                 else:
                     col.add_item(item)
+                    del col.items[orig.id]
             else:
                 col.update_item(item)
 

@@ -2,7 +2,8 @@ import inspect
 import typing as t
 from pathlib import Path
 
-from tungstenkit._internal import storables
+from tungstenkit import exceptions
+from tungstenkit._internal import model_store, storables
 from tungstenkit._internal.constants import DEFAULT_MODEL_MODULE, default_model_repo
 from tungstenkit._internal.model_def_loader import create_model_def_loader
 from tungstenkit._internal.utils.context import change_syspath, change_workingdir
@@ -46,9 +47,14 @@ def build_model(
                 # Determine the model name
                 model_name = default_model_repo() if name is None else name
                 repo_name, tag = parse_docker_image_name(model_name)
-                id = None
-                if tag is None:
+
+                try:
+                    model_data = model_store.get(model_name)
+                    id = model_data.id
+                except exceptions.ModelNotFound:
                     id = storables.ModelData.generate_id()
+
+                if tag is None:
                     tag = id[:7]
                 model_name = f"{repo_name}:{tag}"
 

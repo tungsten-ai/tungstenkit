@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tungstenkit"
-version = "0.2.6"
+version = "0.2.8"
 description = "ML container made simple"
 authors = ["Tungsten Contributors <foss@tungsten-ai.com>"]
 homepage = "https://github.com/tungsten-ai/tungstenkit"
@@ -91,6 +91,7 @@ types-markdown = "^3.4.2.5"
 pytest-timeout = "^2.1.0"
 jsonschema = "^4.17.3"
 responses = "^0.23.1"
+jupyter = "^1.0.0"
 
 [tool.isort]
 multi_line_output = 3

@@ -18,11 +18,12 @@ SUPPORTED_INPUT_TYPES: t.List[t.Type] = [
     io.Video,
     io.Audio,
     io.Binary,
+    io.MaskedImage,
 ]
 SUPPORTED_OUTPUT_COMPOSITE_TYPES: t.List[t.Type] = [io.BaseIO, list, dict]
-SUPPORTED_OUTPUT_TERMINAL_TYPES = SUPPORTED_INPUT_TYPES
+SUPPORTED_OUTPUT_PRIMARY_TYPES = SUPPORTED_INPUT_TYPES
 SUPPORTED_DICT_KEY_TYPES: t.List[t.Type] = [str, bool, int]
-SUPPORTED_OUTPUT_TYPES = SUPPORTED_OUTPUT_TERMINAL_TYPES + SUPPORTED_OUTPUT_COMPOSITE_TYPES
+SUPPORTED_OUTPUT_TYPES = SUPPORTED_OUTPUT_PRIMARY_TYPES + SUPPORTED_OUTPUT_COMPOSITE_TYPES
 
 
 def build_field_type_err_msg(invalid_fields: t.Dict[str, t.Type]):
@@ -119,7 +120,7 @@ def validate_output_class(output_cls: t.Type):
             invalid_types_and_reasons[field_name] = (type_, "unsupported output type")
             return
 
-        for supported_output_type in SUPPORTED_OUTPUT_TERMINAL_TYPES:
+        for supported_output_type in SUPPORTED_OUTPUT_PRIMARY_TYPES:
             if issubclass(origin, supported_output_type):
                 return
 
