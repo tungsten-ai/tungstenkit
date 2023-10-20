@@ -13,12 +13,6 @@ RUN {{ cache.mount_pip_cache() }} pip install {{ " ".join(args) }}
 {% endif %}
 {% endif %}
 
-{% if large_file_rel_paths|length > 0 %}
-{% for large_file_rel_path in large_file_rel_paths %}
-COPY --link --from=large_files /{{ large_file_rel_path.as_posix() }} {{ home_dir_in_container.as_posix() }}/{{ large_file_rel_path.as_posix() }}
-{% endfor %}
-{% endif %}
-
 {% if pip_wheels_in_build_ctx|length > 0 %}
 RUN mkdir -p /tmp/wheels
 {% for path in pip_wheels_in_build_ctx %}
@@ -41,4 +35,9 @@ RUN {{ cache.mount_pip_cache() }} pip install -r /tmp/requirements.txt && \
 {% endfor %}
 {% endif %}
 
+{% if large_file_rel_paths|length > 0 %}
+{% for large_file_rel_path in large_file_rel_paths %}
+COPY --link --from=large_files /{{ large_file_rel_path.as_posix() }} {{ home_dir_in_container.as_posix() }}/{{ large_file_rel_path.as_posix() }}
+{% endfor %}
+{% endif %}
 COPY . {{ home_dir_in_container.as_posix() }}

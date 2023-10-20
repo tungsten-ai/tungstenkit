@@ -1,6 +1,9 @@
 import inspect
+import sys
 import typing as t
 from pathlib import Path
+
+from rich.prompt import Confirm
 
 from tungstenkit import exceptions
 from tungstenkit._internal import model_store, storables
@@ -26,6 +29,36 @@ def build_model(
     abs_path_to_build_dir = Path(build_dir).resolve()
     with change_syspath(build_dir):
         with change_workingdir(abs_path_to_build_dir):
+            # Determine the model name
+            model_name = default_model_repo() if name is None else name
+            repo_name, tag = parse_docker_image_name(model_name)
+
+            # Generate model id
+            existing_model_data = None
+            try:
+                if tag:
+                    existing_model_data = model_store.get(model_name)
+                    id = existing_model_data.id
+                else:
+                    id = storables.ModelData.generate_id()
+            except exceptions.ModelNotFound:
+                id = storables.ModelData.generate_id()
+
+            # Handle duplication
+            if existing_model_data:
+                update_existing_data = Confirm.ask(
+                    f"Model '{existing_model_data.name}' already exists. Remove and replace it?"
+                )
+                if update_existing_data:
+                    model_store.delete(existing_model_data.name)
+                else:
+                    sys.exit(0)
+
+            # Set tag if not set
+            if tag is None:
+                tag = id[:7]
+            model_name = f"{repo_name}:{tag}"
+
             # Load model definition
             model_loader = create_model_def_loader(module_ref, class_name, lazy_import=True)
             input_schema = model_loader.input_class.schema()
@@ -44,20 +77,6 @@ def build_model(
                 module_path=model_module_path,
                 dockerfile_generator=dockerfile_generator,
             ) as build_ctx:
-                # Determine the model name
-                model_name = default_model_repo() if name is None else name
-                repo_name, tag = parse_docker_image_name(model_name)
-
-                try:
-                    model_data = model_store.get(model_name)
-                    id = model_data.id
-                except exceptions.ModelNotFound:
-                    id = storables.ModelData.generate_id()
-
-                if tag is None:
-                    tag = id[:7]
-                model_name = f"{repo_name}:{tag}"
-
                 # Build
                 build_ctx.build(tag=model_name)
 

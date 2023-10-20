@@ -24,7 +24,7 @@ class TemplateArgs:
 
     # System
     device: str
-    gpu_mem_gb: int
+    gpu_mem_gb: float
     system_packages: t.List[str] = attrs.field(factory=list)
     dockerfile_commands: t.List[str] = attrs.field(factory=list)
     env_vars: t.Dict[str, str] = attrs.field(factory=dict)

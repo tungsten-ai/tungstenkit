@@ -48,7 +48,10 @@ def stored_model_name_callback(ctx, param, model_name: t.Optional[str]) -> str:
         try:
             m = model_store.get(model_name)
         except exceptions.NotFound:
-            raise exceptions.NotFound(f"model '{model_name}'")
+            raise exceptions.ModelNotFound(
+                f"'{model_name}'. Build or pull the model first and run this command again. "
+                "You can list models by running `tungsten models`"
+            )
         return m.name
 
     rprint("Finding the latest model image... ", end="")

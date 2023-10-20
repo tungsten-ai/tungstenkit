@@ -29,15 +29,15 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
     def generate(
         self,
         tmp_dir_in_build_ctx: Path,
-        # large_files_image_name: t.Optional[str],
-        # large_file_rel_paths: t.List[Path],
+        large_files_image_name: t.Optional[str],
+        large_file_rel_paths: t.List[Path],
     ):
         template_args = self.build_template_args(
             tmp_dir_in_build_ctx=tmp_dir_in_build_ctx,
-            # large_files_image_name=large_files_image_name,
-            # large_file_rel_paths=large_file_rel_paths,
-            large_files_image_name=None,
-            large_file_rel_paths=[],
+            large_files_image_name=large_files_image_name,
+            large_file_rel_paths=large_file_rel_paths,
+            # large_files_image_name=None,
+            # large_file_rel_paths=[],
         )
         log_debug("Dockerfile template args:\n" + str(template_args))
         log_info("\n")
@@ -178,6 +178,7 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
             gpu_mem_gb=self.config.gpu_mem_gb,
             skip_install_python_packages=self.config.base_image is not None,
             skip_install_system_packages=self.config.base_image is not None,
+            dockerfile_commands=self.config.dockerfile_commands,
         )
 
         return template_args
