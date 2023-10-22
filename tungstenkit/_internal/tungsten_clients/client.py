@@ -74,10 +74,12 @@ class TungstenClient:
         project_full_slug: str,
         version: t.Optional[str] = None,
     ) -> schemas.Model:
+        # Check if project exists
         project_in_server = self.api.get_project(project_full_slug)
         if project_in_server is None:
             raise exceptions.NotFound(f"No project '{project_full_slug}' in {self.api.base_url}")
 
+        # Check version conflict
         if version:
             try:
                 self.api.get_model(project_full_slug, version)
@@ -127,6 +129,7 @@ class TungstenClient:
                 version=version,
                 # source_files=source_files,
                 # skipped_source_files=skipped_source_files,
+                vm="nvidia-l4",  # TODO update this later
             )
 
             model_in_server = self.api.create_model(project_full_slug=project_full_slug, req=req)
