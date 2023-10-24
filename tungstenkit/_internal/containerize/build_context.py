@@ -372,14 +372,10 @@ def _get_large_file_rel_paths(
     candidates = list(
         p.relative_to(abs_path_to_build_dir)
         for p in abs_path_to_build_dir.rglob("*")
-        if p.stat().st_size > LARGE_FILE_THRESHOLD
+        if p.stat().st_size > LARGE_FILE_THRESHOLD and not p.is_symlink()
     )
     return list(
-        p
-        for p in candidates
-        if p.stat().st_size > LARGE_FILE_THRESHOLD
-        and include_spec.match_file(p)
-        and not exclude_spec.match_file(p)
+        p for p in candidates if include_spec.match_file(p) and not exclude_spec.match_file(p)
     )
 
 
