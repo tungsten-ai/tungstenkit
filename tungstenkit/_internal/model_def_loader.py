@@ -10,7 +10,7 @@ import pydantic
 
 from tungstenkit import exceptions
 from tungstenkit._internal import io
-from tungstenkit._internal.configs import ModelConfig
+from tungstenkit._internal.configs import ModelBuildConfig
 from tungstenkit._internal.constants import DEFAULT_MODEL_MODULE, TUNGSTEN_DIR_IN_CONTAINER
 from tungstenkit._internal.model_def import DEFINED_MODEL_SET, TungstenModel
 from tungstenkit._internal.utils.imports import check_module, import_module_in_lazy_import_ctx
@@ -56,20 +56,24 @@ class ModelDefLoader(abc.ABC):
         return self.model.__tungsten_demo_output__
 
     @property
-    def config(self) -> ModelConfig:
+    def has_post_build(self) -> bool:
+        return self.model.__has_post_build__
+
+    @property
+    def build_config(self) -> ModelBuildConfig:
         try:
             config_dict = {
                 k: v for k, v in self.model_class.__tungsten_config__.items() if v is not None
             }
-            c = ModelConfig.with_types(
+            c = ModelBuildConfig.with_types(
                 input_cls=self.input_class,
                 output_cls=self.output_class,
                 demo_output_cls=self.demo_output_class,
-            )(**config_dict)
+            )(has_post_build=self.has_post_build, **config_dict)
         except pydantic.ValidationError as e:
             raise exceptions.ModelConfigError(
                 str(e).replace(
-                    f"for {ModelConfig.__name__}",
+                    f"for {ModelBuildConfig.__name__}",
                     f"in '{get_qualname(self._cls)}'",
                     1,
                 )

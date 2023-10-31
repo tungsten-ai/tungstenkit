@@ -19,9 +19,12 @@ def _raise_module_cannot_be_loaded(exc_msg):
         raise exc
 
     # Re-raise after manipulating traceback
-    except ImportError:
+    except ImportError as e:
         tb = sys.exc_info()[1]
-        back_frame = tb.tb_frame.f_back.f_back
+        try:
+            back_frame = tb.tb_frame.f_back.f_back
+        except BaseException:
+            raise e
 
     back_tb = types.TracebackType(
         tb_next=None,

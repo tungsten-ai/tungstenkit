@@ -1,6 +1,6 @@
 from fastapi.encoders import jsonable_encoder
 
-from tungstenkit._internal.configs import ModelConfig
+from tungstenkit._internal.configs import ModelBuildConfig
 from tungstenkit._internal.model_def_loader import ModelModuleLoader
 
 from . import dummy_model
@@ -14,7 +14,7 @@ def test_model_module_loader():
     assert isinstance(loader.model, dummy_model.DummyModel)
     assert loader.input_class == dummy_model.DummyInput
     assert loader.output_class == dummy_model.DummyOutput
-    config = ModelConfig.with_types(
+    config = ModelBuildConfig.with_types(
         input_cls=dummy_model.DummyInput,
         output_cls=dummy_model.DummyOutput,
         demo_output_cls=dummy_model.DummyOutput,
@@ -23,7 +23,7 @@ def test_model_module_loader():
         readme_md=str(dummy_model.DUMMY_MODEL_README_PATH),
         include_files=dummy_model.DUMMY_MODEL_INCLUDE_FILES,
     )
-    config = ModelConfig.with_types(
+    config = ModelBuildConfig.with_types(
         input_cls=dummy_model.DummyInput,
         output_cls=dummy_model.DummyOutput,
         demo_output_cls=dummy_model.DummyOutput,
@@ -31,6 +31,6 @@ def test_model_module_loader():
     config.environment_variables["TUNGSTEN_MODEL_MODULE"] = dummy_model.__name__
     config.environment_variables["TUNGSTEN_MODEL_CLASS"] = dummy_model.DummyModel.__name__
 
-    loaded_config = jsonable_encoder(loader.config)
+    loaded_config = jsonable_encoder(loader.build_config)
     for key, val in jsonable_encoder(config).items():
         assert loaded_config[key] == val

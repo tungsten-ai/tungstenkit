@@ -23,6 +23,10 @@ class TungstenModel(Protocol):
     __tungsten_input__: t.Type[BaseIO]
     __tungsten_output__: t.Type[BaseIO]
     __tungsten_demo_output__: t.Type[BaseIO]
+    __has_post_build__: bool
+
+    def post_build(self):
+        ...
 
     def setup(self):
         ...
@@ -122,8 +126,8 @@ def define_model(
 
         output (BaseIO): The output class.
 
-        demo_output (BaseIO | None): The demo output class. It is required only when the ``predict_demo``
-        method is defined.
+        demo_output (BaseIO | None): The demo output class. It is required only when the
+            ``predict_demo`` method is defined.
 
         gpu: Indicates if the model requires GPUs.
 
@@ -198,6 +202,8 @@ class _ClassBuilder:
     - ``__tungsten_input__`` attribute
     - ``__tungsten_output__`` attribute
     - ``__tungsten_demo_output__`` attribute
+    - ``__has_post_build__`` attribute
+    - ``post_build`` method
     - ``predict`` method
     - ``predict_demo`` method
     - ``setup`` method
@@ -217,6 +223,7 @@ class _ClassBuilder:
         # ``predict`` method is required.
         if not hasattr(cls, "predict"):
             raise TypeError(f"'predict' method not found in class '{self._cls_qualname}'")
+        self._has_post_build = hasattr(cls, "post_build")
         self._has_setup = hasattr(cls, "setup")
         self._has_predict_demo = hasattr(cls, "predict_demo")
 
@@ -250,14 +257,24 @@ class _ClassBuilder:
         setattr(self._cls, "__tungsten_input__", self._input)
         setattr(self._cls, "__tungsten_output__", self._output)
         setattr(self._cls, "__tungsten_demo_output__", self._demo_output)
+        setattr(self._cls, "__has_post_build__", self._has_post_build)
 
         # Set methods
+        if not self._has_post_build:
+            self._set_default_post_build()
         if not self._has_setup:
             self._set_default_setup()
         if not self._has_predict_demo:
             self._set_default_predict_demo()
 
         return self._cls
+
+    def _set_default_post_build(self):
+        @staticmethod
+        def post_build():
+            pass
+
+        self._set_method(post_build)
 
     def _set_default_setup(self):
         def setup(self):

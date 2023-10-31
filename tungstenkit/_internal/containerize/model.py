@@ -64,13 +64,15 @@ def build_model(
             input_schema = model_loader.input_class.schema()
             output_schema = model_loader.output_class.schema()
             demo_output_schema = model_loader.demo_output_class.schema()
-            model_config = model_loader.config
+            model_config = model_loader.build_config
             model_class = model_loader.model_class
             if copy_files is not None:
                 model_config.copy_files.extend(copy_files)
 
             model_module_path = Path(inspect.getfile(model_class)).resolve()
-            dockerfile_generator = ModelDockerfile(config=model_config)
+            dockerfile_generator = ModelDockerfile(
+                config=model_config, model_module=module_ref, model_class=model_class.__name__
+            )
             with setup_build_ctx(
                 build_config=model_config,
                 build_dir=abs_path_to_build_dir,

@@ -452,6 +452,13 @@ def run(*docker_run_args: str):
     subprocess.run(["docker", "run"] + list(docker_run_args))
 
 
+def check_if_nvidia_container_runtime_available():
+    docker_client = get_docker_client()
+    docker_info = docker_client.api.info()
+    runtimes = docker_info["Runtimes"]
+    return "nvidia" in runtimes
+
+
 def _run_pull_or_push(
     method: Literal["pull", "push"],
     docker_client: DockerClient,

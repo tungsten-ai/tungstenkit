@@ -104,7 +104,7 @@ class BuildConfig(BaseModel):
         return v
 
 
-class ModelConfig(BuildConfig):
+class ModelBuildConfig(BuildConfig):
     batch_size: int = 1
     readme_md: t.Optional[Path] = None
     input_schema: t.Dict
@@ -113,6 +113,7 @@ class ModelConfig(BuildConfig):
     input_filetypes: t.Dict[str, FileType]
     output_filetypes: t.Dict[str, FileType]
     demo_output_filetypes: t.Dict[str, FileType]
+    has_post_build: bool
 
     @classmethod
     def with_types(
