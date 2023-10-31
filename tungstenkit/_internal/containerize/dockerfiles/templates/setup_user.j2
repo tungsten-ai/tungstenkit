@@ -23,7 +23,7 @@ RUN rm -rf /tmp/wheels
 
 {% if not skip_install_python_packages %}
 {% if pip_requirements_txt_in_build_ctx != None %}
-COPY --link "{{ pip_requirements_txt_in_build_ctx.as_posix() }}" /tmp/requirements.txt
+COPY --link ["{{ pip_requirements_txt_in_build_ctx.as_posix() }}", /tmp/requirements.txt]
 RUN {{ cache.mount_pip_cache() }} pip install -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 {% endif%}
@@ -31,7 +31,7 @@ RUN {{ cache.mount_pip_cache() }} pip install -r /tmp/requirements.txt && \
 
 {% if large_file_rel_paths|length > 0 %}
 {% for large_file_rel_path in large_file_rel_paths %}
-COPY --link --from=large_files "/{{ large_file_rel_path.as_posix() }}" "{{ home_dir_in_container.as_posix() }}/{{ large_file_rel_path.as_posix() }}"
+COPY --link --from=large_files ["/{{ large_file_rel_path.as_posix() }}", "{{ home_dir_in_container.as_posix() }}/{{ large_file_rel_path.as_posix() }}"]
 {% endfor %}
 {% endif %}
 COPY . "{{ home_dir_in_container.as_posix() }}"
