@@ -174,13 +174,16 @@ class BuildContext:
     def build(self, tag: str) -> None:
         subprocess_args = [
             "docker",
+            "buildx",
             "build",
+            "--cache-to=type=inline",
             f"--tag={tag}",
             "--file=" + str(self._rel_path_to_dockerfile),
+            "--output=type=docker,push=false",
         ]
         subprocess_args.append(str(self.abs_path_to_build_dir))
         log_debug(msg="$ " + " ".join(subprocess_args), pretty=False)
-        res = subprocess.run(subprocess_args, check=False, env={"DOCKER_BUILDKIT": "1"})
+        res = subprocess.run(subprocess_args, check=False)
 
         if res.returncode != 0:
             with hide_traceback():
