@@ -5,19 +5,21 @@ import attrs
 from packaging.version import Version
 
 from tungstenkit._internal.constants import WORKING_DIR_IN_CONTAINER
+from tungstenkit._versions import pkg_version
 
-from ..base_images import BaseImage
+from .base_images import BaseImage
 
 
 @attrs.define(kw_only=True)
 class TemplateArgs:
     # Docker
     image: BaseImage
-    large_files_image_name: t.Optional[str]
 
     # Tungsten
+    tungstenkit_version: str = str(pkg_version)
     python_entrypoint: str
     large_file_rel_paths: t.List[Path]
+    small_files_base_dir_rel_path: Path
     tungsten_env_vars: t.Dict[str, str] = attrs.field(factory=dict)
     home_dir_in_container: PurePosixPath = attrs.field(default=WORKING_DIR_IN_CONTAINER)
     copy_files: t.List[t.Tuple[str, str]] = attrs.field(factory=list)

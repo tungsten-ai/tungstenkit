@@ -105,6 +105,8 @@ class BuildConfig(BaseModel):
 
 
 class ModelBuildConfig(BuildConfig):
+    model_module_ref: str
+    model_class_name: str
     batch_size: int = 1
     readme_md: t.Optional[Path] = None
     input_schema: t.Dict

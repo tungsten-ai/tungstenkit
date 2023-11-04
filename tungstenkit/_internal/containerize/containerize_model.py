@@ -12,14 +12,13 @@ from tungstenkit._internal.model_def_loader import create_model_def_loader
 from tungstenkit._internal.utils.context import change_syspath, change_workingdir
 from tungstenkit._internal.utils.docker_client import parse_docker_image_name
 
-from .build_context import setup_build_ctx
-from .dockerfiles import ModelDockerfile
+from .build_context import BuildContext
 
 if t.TYPE_CHECKING:
     from _typeshed import StrPath
 
 
-def build_model(
+def containerize_model(
     build_dir: "StrPath" = ".",
     module_ref: str = DEFAULT_MODEL_MODULE,
     class_name: t.Optional[str] = None,
@@ -64,20 +63,16 @@ def build_model(
             input_schema = model_loader.input_class.schema()
             output_schema = model_loader.output_class.schema()
             demo_output_schema = model_loader.demo_output_class.schema()
-            model_config = model_loader.build_config
+            model_build_config = model_loader.build_config
             model_class = model_loader.model_class
             if copy_files is not None:
-                model_config.copy_files.extend(copy_files)
+                model_build_config.copy_files.extend(copy_files)
 
             model_module_path = Path(inspect.getfile(model_class)).resolve()
-            dockerfile_generator = ModelDockerfile(
-                config=model_config, model_module=module_ref, model_class=model_class.__name__
-            )
-            with setup_build_ctx(
-                build_config=model_config,
-                build_dir=abs_path_to_build_dir,
-                module_path=model_module_path,
-                dockerfile_generator=dockerfile_generator,
+            with BuildContext(
+                build_config=model_build_config,
+                abs_path_to_build_dir=abs_path_to_build_dir,
+                abs_path_to_tungsten_module=model_module_path,
             ) as build_ctx:
                 # Build
                 build_ctx.build(tag=model_name)
@@ -87,13 +82,13 @@ def build_model(
                     input_schema=input_schema,
                     output_schema=output_schema,
                     demo_output_schema=demo_output_schema,
-                    input_filetypes=model_config.input_filetypes,
-                    output_filetypes=model_config.output_filetypes,
-                    demo_output_filetypes=model_config.demo_output_filetypes,
+                    input_filetypes=model_build_config.input_filetypes,
+                    output_filetypes=model_build_config.output_filetypes,
+                    demo_output_filetypes=model_build_config.demo_output_filetypes,
                 )
                 avatar = storables.AvatarData.fetch_default(hash_key=model_name)
-                if model_config.readme_md:
-                    readme = storables.MarkdownData.from_path(model_config.readme_md)
+                if model_build_config.readme_md:
+                    readme = storables.MarkdownData.from_path(model_build_config.readme_md)
                 else:
                     readme = None
 
@@ -103,7 +98,6 @@ def build_model(
                     avatar=avatar,
                     readme=readme,
                     id=id,
-                    source_files=build_ctx.walk_fs(),
                 )
                 model_data.save()
                 return storables.ModelData.load(model_name)

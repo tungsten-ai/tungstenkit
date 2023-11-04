@@ -1,3 +1,3 @@
-from .model import build_model
+from .containerize_model import containerize_model
 
-__all__ = ["build_model"]
+__all__ = ["containerize_model"]

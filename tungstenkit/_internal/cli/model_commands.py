@@ -14,7 +14,7 @@ from tungstenkit._internal.constants import (
     TUNGSTEN_DIR_IN_CONTAINER,
     TUNGSTEN_LOGO,
 )
-from tungstenkit._internal.containerize import build_model
+from tungstenkit._internal.containerize import containerize_model
 from tungstenkit._internal.demo_server import start_demo_server
 from tungstenkit._internal.pred_interface.local_interface import LocalModel
 from tungstenkit._internal.storables import ModelData
@@ -101,7 +101,7 @@ def build(
 
     # Start to build
     print(TUNGSTEN_LOGO)
-    model_data = build_model(
+    model_data = containerize_model(
         module_ref=model_module,
         class_name=model_class,
         copy_files=_copy_files,

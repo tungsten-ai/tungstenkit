@@ -1,8 +1,5 @@
 {% import 'macros/cache.j2' as cache %}
 
-{% if large_files_image_name %}
-FROM {{ large_files_image_name }} AS large_files
-{% endif %}
 FROM {{ image.get_repository() }}:{{ image.get_tag() }}
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive

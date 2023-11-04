@@ -69,7 +69,12 @@ class ModelDefLoader(abc.ABC):
                 input_cls=self.input_class,
                 output_cls=self.output_class,
                 demo_output_cls=self.demo_output_class,
-            )(has_post_build=self.has_post_build, **config_dict)
+            )(
+                has_post_build=self.has_post_build,
+                model_module_ref=self.model_class.__module__,
+                model_class_name=self.model_class.__name__,
+                **config_dict,
+            )
         except pydantic.ValidationError as e:
             raise exceptions.ModelConfigError(
                 str(e).replace(

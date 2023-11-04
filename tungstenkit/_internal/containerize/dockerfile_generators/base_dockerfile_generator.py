@@ -11,15 +11,13 @@ from tungstenkit._internal.configs import BuildConfig
 from tungstenkit._internal.logging import log_debug, log_info, log_warning
 from tungstenkit._internal.utils.version import NotRequired
 
-from ..base_images import BaseImage, CUDAImageCollection, CustomImage, PythonImageCollection
-from ..gpu_pkg_collections import supported_gpu_pkg_names
-from ..pkg_manager import PythonPackageManager, RequirementsTxt
+from .base_images import BaseImage, CUDAImageCollection, CustomImage, PythonImageCollection
+from .gpu_pkg_collections import supported_gpu_pkg_names
+from .pkg_manager import PythonPackageManager, RequirementsTxt
 from .template_args import TemplateArgs
 
-LARGE_FILE_THRESHOLD = 100 * 1024**2
 
-
-class BaseDockerfile(metaclass=abc.ABCMeta):
+class BaseDockerfileGenerator(metaclass=abc.ABCMeta):
     def __init__(
         self,
         config: BuildConfig,
@@ -28,16 +26,16 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
     def generate(
         self,
-        tmp_dir_in_build_ctx: Path,
-        large_files_image_name: t.Optional[str],
-        large_file_rel_paths: t.List[Path],
+        abs_path_to_build_dir: Path,
+        rel_path_to_pip_requirements_txt: Path,
+        rel_paths_to_large_files: t.List[Path],
+        rel_path_to_smal_files_base_dir: Path,
     ):
-        template_args = self.build_template_args(
-            tmp_dir_in_build_ctx=tmp_dir_in_build_ctx,
-            large_files_image_name=large_files_image_name,
-            large_file_rel_paths=large_file_rel_paths,
-            # large_files_image_name=None,
-            # large_file_rel_paths=[],
+        template_args = self._build_template_args(
+            abs_path_to_build_dir=abs_path_to_build_dir,
+            rel_path_to_pip_requirements_txt=rel_path_to_pip_requirements_txt,
+            rel_paths_to_large_files=rel_paths_to_large_files,
+            rel_path_to_small_files_base_dir=rel_path_to_smal_files_base_dir,
         )
         log_debug("Dockerfile template args:\n" + str(template_args))
         log_info("\n")
@@ -59,11 +57,12 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
         return dockerfile
 
-    def build_template_args(
+    def _build_template_args(
         self,
-        tmp_dir_in_build_ctx: Path,
-        large_files_image_name: t.Optional[str],
-        large_file_rel_paths: t.List[Path],
+        abs_path_to_build_dir: Path,
+        rel_path_to_pip_requirements_txt: Path,
+        rel_paths_to_large_files: t.List[Path],
+        rel_path_to_small_files_base_dir: Path,
     ):
         # TODO perfer cuda version available in docker hub
         # TODO check py vers compatible with miniforge3
@@ -118,7 +117,6 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
         # Prepare requirements.txt and pip install commands
         list_pip_install_args = []
         requirements_txt = RequirementsTxt()
-        pip_requirements_txt_path = tmp_dir_in_build_ctx / "requirements.txt"
 
         gpu_pkg_requirements = py_pkg_manager.list_gpu_pkg_pip_requirements()
         for r in gpu_pkg_requirements:
@@ -132,7 +130,9 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
                 requirements_txt.add_requirement(r)
 
         requirements_txt_content = requirements_txt.build()
-        pip_requirements_txt_path.write_text(requirements_txt_content)
+        (abs_path_to_build_dir / rel_path_to_pip_requirements_txt).write_text(
+            requirements_txt_content
+        )
         log_debug("pip install args: " + str(list_pip_install_args), pretty=False)
         log_debug("python requirements.txt:\n" + requirements_txt_content, pretty=False)
 
@@ -163,11 +163,11 @@ class BaseDockerfile(metaclass=abc.ABCMeta):
 
         template_args = TemplateArgs(
             image=image,
-            large_files_image_name=large_files_image_name,
-            large_file_rel_paths=large_file_rel_paths,
+            large_file_rel_paths=rel_paths_to_large_files,
+            small_files_base_dir_rel_path=rel_path_to_small_files_base_dir,
             python_version=py_ver,
             python_entrypoint=self.python_entrypoint(),
-            pip_requirements_txt_in_build_ctx=pip_requirements_txt_path,
+            pip_requirements_txt_in_build_ctx=rel_path_to_pip_requirements_txt,
             list_pip_install_args=list_pip_install_args,
             system_packages=self.config.system_packages,
             pip_wheels_in_build_ctx=self.config.pip_wheels,

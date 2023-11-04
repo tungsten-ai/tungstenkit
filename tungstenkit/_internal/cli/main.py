@@ -50,3 +50,6 @@ def main():
 
 def _excepthook(exctype, value, tb):
     log_exception(exctype=exctype, exc=value, tb=tb, show_tungsten_exc_tb=False)
+
+if __name__ == "__main__":
+    main()

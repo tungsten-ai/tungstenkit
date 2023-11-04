@@ -1,12 +1,10 @@
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 import typing as t
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import contextmanager
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from uuid import uuid4
 
 import attrs
@@ -15,94 +13,172 @@ from pathspec import PathSpec
 from rich.progress import Progress, TextColumn
 
 from tungstenkit import exceptions
-from tungstenkit._internal import storables
+from tungstenkit._internal import constants
 from tungstenkit._internal.configs import BuildConfig
-from tungstenkit._internal.constants import TUNGSTEN_DIR_IN_CONTAINER
-from tungstenkit._internal.logging import log_debug, log_info, log_warning
+from tungstenkit._internal.logging import log_debug, log_info
 from tungstenkit._internal.utils.context import hide_traceback
-from tungstenkit._internal.utils.docker_builder import create_files_image_tarball
-from tungstenkit._internal.utils.docker_client import (
-    load_docker_image_from_file,
-    remove_docker_image,
-)
 from tungstenkit._internal.utils.file import (
     format_file_size,
     get_tree_size_in_bytes,
     is_relative_to,
 )
 
-from .dockerfiles import BaseDockerfile
+from .dockerfile_generators import BaseDockerfileGenerator, create_dockerfile_generator
 
-TMP_DIR_NAME = ".tungsten-build"
-LARGE_FILE_THRESHOLD = 100 * 1024**2  # 100MB
+
+def is_abs_path(instance, attribute, value: Path):
+    return value.is_absolute()
 
 
 @attrs.define
 class BuildContext:
-    config: BuildConfig
-    root_dir: Path
-    dockerfile_path: Path
+    # {build_dir}
+    # ├─ .tungsten-build
+    # │   ├─ Dockerfile
+    # │   ├─ requirements.txt
+    # │   ├─ small_files
+    # │   │  └─ ...
+    # │   └─ files_outside_build_dir
+    # │      └─ {files added by --copy-files option}
+    # ├─ {tungsten_module} (e.g. tungsten_model.py)
+    # └─ ...
 
-    def walk_fs(self) -> t.Generator[storables.SourceFile, None, None]:
-        """
-        Recursively yield files under ``TUNGSTEN_DIR_IN_CONTAINER`` in container fs
-        """
-        abs_root_dir = self.root_dir.resolve()
-        include_spec = PathSpec.from_lines("gitwildmatch", self.config.include_files)
-        exclude_spec = PathSpec.from_lines(
-            "gitwildmatch", self.config.exclude_files + [TMP_DIR_NAME + "*/"]
+    build_config: BuildConfig = attrs.field(validator=[attrs.validators.instance_of(BuildConfig)])
+    abs_path_to_build_dir: Path = attrs.field(
+        validator=[attrs.validators.instance_of(Path), is_abs_path]
+    )
+    abs_path_to_tungsten_module: Path = attrs.field(
+        validator=[attrs.validators.instance_of(Path), is_abs_path]
+    )
+    _dockerfile_generator: BaseDockerfileGenerator = attrs.field(init=False)
+
+    # To handle race condition of .tungsten-build dir
+    _filelock: FileLock = attrs.field(init=False)
+
+    @property
+    def _rel_path_to_tungsten_module(self):
+        return self.abs_path_to_tungsten_module.relative_to(self.abs_path_to_build_dir)
+
+    @property
+    def _rel_path_to_tmp_dir(self):
+        return Path(".tungsten-build")
+
+    @property
+    def _rel_path_to_build_filelock(self):
+        return self._rel_path_to_tmp_dir.with_name(self._rel_path_to_tmp_dir.name + ".lock")
+
+    @property
+    def _rel_path_to_dockerfile(self):
+        return self._rel_path_to_tmp_dir / "Dockerfile"
+
+    @property
+    def _rel_path_to_pip_requirements_txt(self):
+        return self._rel_path_to_tmp_dir / "requirements.txt"
+
+    @property
+    def _rel_path_to_small_files_dir(self):
+        return self._rel_path_to_tmp_dir / "small_files"
+
+    @property
+    def _rel_path_to_copy_files_dir(self):
+        return self._rel_path_to_tmp_dir / "files_outside_build_dir"
+
+    @property
+    def _include_spec(self):
+        return PathSpec.from_lines("gitwildmatch", self.build_config.include_files)
+
+    @property
+    def _exclude_spec(self):
+        return PathSpec.from_lines(
+            "gitwildmatch",
+            self.build_config.exclude_files + [self._rel_path_to_tmp_dir.as_posix()],
         )
 
-        for rel_path_str in include_spec.match_tree(self.root_dir, follow_links=False):
-            posix_rel_path_str = Path(rel_path_str).as_posix()
-            if not exclude_spec.match_file(posix_rel_path_str):
-                abs_path_in_host_fs = abs_root_dir / rel_path_str
-                size = (
-                    abs_path_in_host_fs.lstat().st_size
-                    if abs_path_in_host_fs.is_symlink()
-                    else abs_path_in_host_fs.stat().st_size
-                )
-                yield storables.SourceFile(
-                    abs_path_in_host_fs=abs_path_in_host_fs,
-                    rel_path_in_model_fs=PurePosixPath(posix_rel_path_str),
-                    size=size,
-                )
-        if self.config.copy_files:
-            for pathstr_in_host_fs, pathstr_in_model_fs in self.config.copy_files:
-                abs_path_in_host_fs = Path(pathstr_in_host_fs)
-                if not abs_path_in_host_fs.is_absolute():
-                    abs_path_in_host_fs = abs_root_dir / abs_path_in_host_fs
+    @abs_path_to_tungsten_module.validator
+    def _exists_in_build_dir(self, attribute, value: Path):
+        try:
+            value.relative_to(self.abs_path_to_build_dir)
+        except ValueError:
+            raise exceptions.BuildError(
+                f"Python module '{self.abs_path_to_tungsten_module}' is outside build dir "
+                f"at '{self.abs_path_to_build_dir}'"
+            )
 
-                path_in_model_fs = PurePosixPath(pathstr_in_model_fs)
-                if path_in_model_fs.is_absolute():
-                    if not is_relative_to(path_in_model_fs, TUNGSTEN_DIR_IN_CONTAINER):
-                        continue
-                    rel_path_in_model_fs = path_in_model_fs.relative_to(TUNGSTEN_DIR_IN_CONTAINER)
-                else:
-                    rel_path_in_model_fs = path_in_model_fs
+    def __attrs_post_init__(self):
+        log_info(
+            f"Add files from '{self.abs_path_to_build_dir.resolve()}' to container"
+            f"\n include_files: {self.build_config.include_files}"
+            f"\n exclude_files: {self.build_config.exclude_files}\n"
+        )
 
-                size = (
-                    abs_path_in_host_fs.lstat().st_size
-                    if abs_path_in_host_fs.is_symlink()
-                    else abs_path_in_host_fs.stat().st_size
-                )
-                yield storables.SourceFile(
-                    abs_path_in_host_fs=abs_path_in_host_fs,
-                    rel_path_in_model_fs=rel_path_in_model_fs,
-                    size=size,
-                )
+        # Includes the tungsten module
+        self.build_config.include_files.append(
+            ("/" / self._rel_path_to_tungsten_module).as_posix()
+        )
+
+        # Create dockerfile generator
+        self._dockerfile_generator = create_dockerfile_generator(self.build_config)
+
+    def __enter__(self):
+        # Prepare tmp dir
+        abs_path_to_tmp_dir = self.abs_path_to_build_dir / self._rel_path_to_tmp_dir
+        abs_path_to_filelock = self.abs_path_to_build_dir / self._rel_path_to_build_filelock
+        if abs_path_to_filelock.exists() and FileLock(abs_path_to_filelock).is_locked:
+            raise exceptions.BuildError(
+                "A build is already in progress. Restart after the build in progress is complete."
+            )
+        if abs_path_to_tmp_dir.exists():
+            shutil.rmtree(abs_path_to_tmp_dir)
+
+        abs_path_to_tmp_dir.mkdir()
+
+        # Acaquire filelock
+        self._filelock = FileLock(abs_path_to_filelock)
+        self._filelock.acquire()
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            future_list: t.List[Future] = []
+
+            # Copy files
+            self._copy_small_files_to_tmp_dir(executor=executor, future_list=future_list)
+            self._copy_files_outside_build_dir_to_tmp_dir(
+                executor=executor,
+                future_list=future_list,
+            )
+            self._show_progress_while_writing_files(
+                future_list=future_list,
+            )
+
+            # Generate Dockerfile
+            dockerfile = self._dockerfile_generator.generate(
+                abs_path_to_build_dir=self.abs_path_to_build_dir,
+                rel_path_to_pip_requirements_txt=self._rel_path_to_pip_requirements_txt,
+                rel_paths_to_large_files=[
+                    p.relative_to(self.abs_path_to_build_dir) for p in self._traverse_large_files()
+                ],
+                rel_path_to_smal_files_base_dir=self._rel_path_to_small_files_dir,
+            )
+            (self.abs_path_to_build_dir / self._rel_path_to_dockerfile).write_text(dockerfile)
+            log_debug(
+                "Dockerfile:\n"
+                + "\n".join(["  " + line for line in dockerfile.strip().split("\n") if line]),
+                pretty=False,
+            )
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self._filelock.release()
+        shutil.rmtree(self.abs_path_to_build_dir / self._rel_path_to_tmp_dir)
 
     def build(self, tag: str) -> None:
         subprocess_args = [
             "docker",
-            "buildx",
             "build",
             f"--tag={tag}",
-            "--cache-to=type=inline",
-            "--file=" + str(self.dockerfile_path.relative_to(self.root_dir)),
-            "--output=type=docker,compression=zstd,force-compression=true,push=false",
+            "--file=" + str(self._rel_path_to_dockerfile),
         ]
-        subprocess_args.append(str(self.root_dir))
+        subprocess_args.append(str(self.abs_path_to_build_dir))
         log_debug(msg="$ " + " ".join(subprocess_args), pretty=False)
         res = subprocess.run(subprocess_args, check=False, env={"DOCKER_BUILDKIT": "1"})
 
@@ -112,216 +188,107 @@ class BuildContext:
                     f"Failed to build {tag}. For the reason, refer to above build logs."
                 )
 
+    def _copy_small_files_to_tmp_dir(
+        self, executor: ThreadPoolExecutor, future_list: t.List[Future]
+    ) -> None:
+        for p_src_abs in self._traverse_small_files():
+            p_src_rel = p_src_abs.relative_to(self.abs_path_to_build_dir)
+            p_src_rel_posix = p_src_rel.as_posix()
 
-@contextmanager
-def setup_build_ctx(
-    build_config: BuildConfig,
-    build_dir: Path,
-    module_path: Path,
-    dockerfile_generator: BaseDockerfile,
-):
-    assert build_dir.is_absolute()
-    assert module_path.is_absolute()
-    try:
-        rel_path_to_module = module_path.relative_to(build_dir)
-    except ValueError:
-        raise exceptions.BuildError(
-            f"Python module '{module_path}' is outside build dir at '{build_dir}'"
-        )
+            p_dest = self.abs_path_to_build_dir / self._rel_path_to_small_files_dir / p_src_rel
 
-    log_info(
-        f"Add files from '{build_dir.resolve()}' to container"
-        f"\n include_files: {build_config.include_files}"
-        f"\n exclude_files: {build_config.exclude_files}\n"
-    )
-    build_config.include_files.append(("/" / rel_path_to_module).as_posix())
+            # Symlink with abs path & outside build dir -> append to copy_files
+            # Symlink with abs path & inside build dir -> create symlink with rel path
+            if p_src_abs.is_symlink():
+                p_link_src = Path(os.readlink(str(p_src_abs)))
+                if p_link_src.is_absolute():
+                    if is_relative_to(p_link_src, start=self.abs_path_to_build_dir):
+                        p_dest.parent.mkdir(exist_ok=True, parents=True)
+                        os.symlink(
+                            _convert_abs_link_src_to_rel(p_link_src, p_src_abs),
+                            self.abs_path_to_build_dir
+                            / self._rel_path_to_small_files_dir
+                            / p_src_rel,
+                        )
+                    else:
+                        self.build_config.copy_files.append(
+                            (str(p_link_src.resolve()), p_src_rel_posix)
+                        )
+                    continue
 
-    # Prepare tmp dir
-    rel_path_to_tmp_dir = Path(TMP_DIR_NAME)
-    try:
-        lock_path = rel_path_to_tmp_dir / ".tungsten-build.lock"
-        if lock_path.exists() and FileLock(lock_path).is_locked:
-            raise exceptions.BuildError(
-                "A build is already in progress. Restart after the build in progress is complete."
+            # Supports only regular files and symlinks
+            if not p_src_abs.is_symlink() and not p_src_abs.is_file():
+                raise exceptions.BuildError(f"Not file or symlink: {p_src_rel}")
+
+            # Regular file or symlink with rel path -> copy to tmp dir
+            p_dest.parent.mkdir(exist_ok=True, parents=True)
+            future_list.append(
+                executor.submit(
+                    shutil.copy,
+                    str(p_src_abs),
+                    p_dest,
+                    follow_symlinks=False,
+                )
             )
-        if rel_path_to_tmp_dir.exists():
-            shutil.rmtree(rel_path_to_tmp_dir)
 
-        rel_path_to_tmp_dir.mkdir()
+    def _copy_files_outside_build_dir_to_tmp_dir(
+        self,
+        executor: ThreadPoolExecutor,
+        future_list: t.List[Future],
+    ):
+        """Create tmp files for `build_config.copy_files` and update `build_config.copy_files`"""
+        if len(self.build_config.copy_files) > 0:
+            log_info("Copy extra files to container")
 
-        with FileLock(lock_path):
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                with _large_files_image(
-                    build_dir, build_config.include_files, build_config.exclude_files
-                ) as (
-                    large_file_rel_paths,
-                    large_files_image_name,
-                ):
-                    # TODO handle the case where copy_files include large files
+        p_dest_rel_and_p_container_pairs: t.List[t.Tuple[str, str]] = []
+        for p_src_str, p_container_str in self.build_config.copy_files:
+            p_src = Path(p_src_str)
+            p_src_abs = p_src if p_src.is_absolute() else self.abs_path_to_build_dir / p_src
 
-                    rel_path_to_dockerfile = rel_path_to_tmp_dir / "Dockerfile"
-                    future_list: t.List[Future] = []
-
-                    build_config.copy_files.extend(
-                        _convert_abs_symlinks_to_rel(
-                            build_dir,
-                            include_patterns=build_config.include_files,
-                            exclude_patterns=build_config.exclude_files,
-                            rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                        )
-                    )
-                    if build_config.copy_files:
-                        build_config.copy_files = _copy_files(
-                            abs_path_to_build_dir=build_dir,
-                            rel_path_to_tmp_dir=rel_path_to_tmp_dir,
-                            include_with_dest=build_config.copy_files,
-                            executor=executor,
-                            future_list=future_list,
-                        )
-                        _show_progress_while_copying_files(
-                            copy_dir=rel_path_to_tmp_dir,
-                            future_list=future_list,
-                            ignore_patterns=["tungstenkit"],
-                        )
-
-                    dockerfile = dockerfile_generator.generate(
-                        tmp_dir_in_build_ctx=rel_path_to_tmp_dir,
-                        large_files_image_name=large_files_image_name,
-                        large_file_rel_paths=large_file_rel_paths,
-                    )
-                    dockerfile_path = build_dir / rel_path_to_dockerfile
-                    dockerfile_path.write_text(dockerfile)
-                    log_debug(
-                        "Dockerfile:\n"
-                        + "\n".join(
-                            ["  " + line for line in dockerfile.strip().split("\n") if line]
-                        ),
-                        pretty=False,
-                    )
-
-                    dockerignore_lines = _get_dockerignore_lines(
-                        build_dir,
-                        build_config.include_files,
-                        build_config.exclude_files,
-                    )
-                    log_debug("")
-                    log_debug(
-                        ".dockerignore:\n"
-                        + "\n".join([" " + line for line in dockerignore_lines]),
-                        pretty=False,
-                    )
-                    dockerignore_path = Path(str(dockerfile_path) + ".dockerignore")
-                    with dockerignore_path.open("w") as f:
-                        for line in dockerignore_lines:
-                            f.write(line + "\n")
-                    log_debug(f"Saved .dockerignore at {dockerignore_path}")
-                    log_debug("")
-
-                    yield BuildContext(
-                        config=build_config,
-                        root_dir=build_dir,
-                        dockerfile_path=dockerfile_path,
-                    )
-    finally:
-        shutil.rmtree(rel_path_to_tmp_dir)
-
-
-def _convert_abs_symlinks_to_rel(
-    abs_path_to_build_dir: Path,
-    include_patterns: t.List[str],
-    exclude_patterns: t.List[str],
-    rel_path_to_tmp_dir: Path,
-) -> t.List[t.Tuple[str, str]]:
-    link_and_target_pairs: t.List[t.Tuple[str, str]] = []
-    include_spec = PathSpec.from_lines("gitwildmatch", include_patterns)
-    exclude_spec = PathSpec.from_lines(
-        "gitwildmatch", exclude_patterns + [rel_path_to_tmp_dir.as_posix()]
-    )
-    for link_path in list(abs_path_to_build_dir.rglob("*")):
-        if not link_path.is_symlink():
-            continue
-
-        pattern = link_path.relative_to(abs_path_to_build_dir).as_posix()
-        if include_spec.match_file(pattern) and not exclude_spec.match_file(pattern):
-            orig_target = Path(os.readlink(str(link_path)))
-
-            if not orig_target.is_absolute():
-                continue
-
-            if not orig_target.exists():
-                log_warning(f"Target of symbolic link '{link_path}' does not exist")
-                continue
-
-            try:
-                orig_target.relative_to(abs_path_to_build_dir)
-            except ValueError:
+            # Check existence
+            if not p_src_abs.is_symlink() and not p_src_abs.exists():
                 raise exceptions.BuildError(
-                    f"Target '{orig_target}' of link '{link_path}' is outside build dir at "
-                    f"'{abs_path_to_build_dir}'"
+                    f"Failed to copy '{p_src_str}' to '{p_container_str}'. "
+                    f"'{p_src_str}' does not exist."
                 )
-            tmp_link_path = (
-                abs_path_to_build_dir
-                / rel_path_to_tmp_dir
-                / "symlinks"
-                / link_path.relative_to(abs_path_to_build_dir)
-            )
-            new_target = os.path.relpath(orig_target, start=tmp_link_path)
-            tmp_link_path.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(new_target, tmp_link_path)
-            log_debug(f"Change target of link '{link_path}': '{orig_target}' -> '{new_target}'")
-            link_and_target_pairs.append(
-                (
-                    str(tmp_link_path),
-                    link_path.relative_to(abs_path_to_build_dir).as_posix(),
-                )
-            )
 
-    return link_and_target_pairs
+            # Check existence of symlink target and resolve
+            if p_src_abs.is_symlink():
+                p_src_link_target = p_src_abs.resolve()
+                if not p_src_link_target.exists():
+                    raise exceptions.BuildError(
+                        f"Failed to copy '{p_src_str}' to '{p_container_str}'. "
+                        f"Target '{p_src_link_target}' of symlink '{p_src_str}' does not exist."
+                    )
+                p_src = p_src_abs = p_src_link_target
 
-
-def _copy_files(
-    abs_path_to_build_dir: Path,
-    rel_path_to_tmp_dir: Path,
-    include_with_dest: t.List[t.Tuple[str, str]],
-    executor: ThreadPoolExecutor,
-    future_list: t.List[Future],
-) -> t.List[t.Tuple[str, str]]:
-    if len(include_with_dest) > 0:
-        log_info("Copy extra files to container")
-
-    files_with_dest: t.List[t.Tuple[str, str]] = []
-    for src_str, dest_str in include_with_dest:
-        src_in_host = Path(src_str)
-        src_in_host = (
-            src_in_host if src_in_host.is_absolute() else abs_path_to_build_dir / src_in_host
-        )
-        if not src_in_host.is_symlink() and not src_in_host.exists():
-            raise exceptions.BuildError(
-                f"Failed to copy '{src_str}' to '{dest_str}'. '{src_str}' does not exist."
+            # Copy to tmp dir.
+            log_info(f" '{p_src_str}' (host) -> '{p_container_str}' (container)")
+            p_dest_abs = (
+                self.abs_path_to_build_dir
+                / self._rel_path_to_copy_files_dir
+                / uuid4().hex
+                / p_src_abs.name
             )
-        tmp_dir = abs_path_to_build_dir / rel_path_to_tmp_dir
-        if is_relative_to(src_in_host, tmp_dir):
-            src_in_build_ctx = src_in_host
-        else:
-            log_info(f" '{src_str}' (host) -> '{dest_str}' (container)")
-            src_in_build_ctx = (
-                abs_path_to_build_dir / rel_path_to_tmp_dir / uuid4().hex / src_in_host.name
-            )
-            if src_in_host.is_symlink() or src_in_host.is_file():
+            p_dest_abs.parent.mkdir(parents=True, exist_ok=True)
+            if p_src_abs.is_file():
                 future_list.append(
                     executor.submit(
-                        shutil.copy, str(src_in_host), str(src_in_build_ctx), follow_symlinks=False
+                        shutil.copy,
+                        str(p_src_abs),
+                        str(p_dest_abs),
+                        follow_symlinks=False,
                     )
                 )
-            else:
-                src_in_build_ctx.mkdir(exist_ok=True, parents=True)
-                for element in src_in_host.iterdir():
+            elif p_src_abs.is_dir():
+                p_dest_abs.mkdir()
+                for element in p_src_abs.iterdir():
                     if element.is_dir():
                         future_list.append(
                             executor.submit(
                                 shutil.copytree,
                                 str(element),
-                                str(src_in_build_ctx / element.name),
+                                str(p_dest_abs / element.name),
                                 symlinks=False,
                                 ignore_dangling_symlinks=True,
                             )
@@ -331,138 +298,93 @@ def _copy_files(
                             executor.submit(
                                 shutil.copy,
                                 str(element),
-                                str(src_in_build_ctx / Path(element).name),
+                                str(p_dest_abs / Path(element).name),
                             )
                         )
-        files_with_dest.append(
-            (src_in_build_ctx.relative_to(abs_path_to_build_dir).as_posix(), dest_str)
-        )
+            else:
+                raise exceptions.BuildError(
+                    f"'{p_src_str}' is not regular file, symlink, or directory"
+                )
 
-    log_info("")
-    return files_with_dest
+            p_dest_rel_and_p_container_pairs.append(
+                (
+                    p_dest_abs.relative_to(self.abs_path_to_build_dir).as_posix(),
+                    p_container_str,
+                )
+            )
 
+        log_info("")
+        self.build_config.copy_files = p_dest_rel_and_p_container_pairs
 
-def _show_progress_while_copying_files(
-    copy_dir: Path, future_list: t.List[Future], ignore_patterns: t.Optional[t.List[str]] = None
-):
-    progress = Progress(TextColumn("{task.description}"))
-    desc_prefix = "Copied: "
-    task = progress.add_task(desc_prefix + "0B")
-    with progress:
-        while not all(fut.done() for fut in future_list):
-            size_in_bytes = get_tree_size_in_bytes(
-                root_dir=copy_dir, ignore_patterns=ignore_patterns
+    def _show_progress_while_writing_files(self, future_list: t.List[Future]):
+        if not future_list:
+            return
+
+        progress = Progress(TextColumn("{task.description}"))
+        large_files_size = sum([p.stat().st_size for p in self._traverse_large_files()])
+        desc_prefix = "Creating build context: "
+        task = progress.add_task(desc_prefix + f"{large_files_size}B")
+
+        def update_progress():
+            size_in_bytes = (
+                get_tree_size_in_bytes(
+                    root_dir=self.abs_path_to_build_dir / self._rel_path_to_small_files_dir
+                )
+                + get_tree_size_in_bytes(
+                    root_dir=self.abs_path_to_build_dir / self._rel_path_to_copy_files_dir
+                )
+                + large_files_size
             )
             human_readable_size = format_file_size(size_in_bytes)
             progress.update(task, description=desc_prefix + human_readable_size)
-            time.sleep(0.1)
 
-        size_in_bytes = get_tree_size_in_bytes(root_dir=copy_dir, ignore_patterns=["tungstenkit"])
-        human_readable_size = format_file_size(size_in_bytes)
-        progress.update(task, description=desc_prefix + human_readable_size)
+        with progress:
+            while not all(fut.done() for fut in future_list):
+                update_progress()
+                time.sleep(0.1)
 
-    log_info("")
+            update_progress()
 
+        log_info("")
 
-def _get_large_file_rel_paths(
-    abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
-):
-    include_spec = PathSpec.from_lines("gitwildmatch", include_files)
-    exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_files + [TMP_DIR_NAME + "*/"])
-    candidates = list(
-        p.relative_to(abs_path_to_build_dir)
-        for p in abs_path_to_build_dir.rglob("*")
-        if p.stat().st_size > LARGE_FILE_THRESHOLD and not p.is_symlink()
-    )
-    return list(
-        p for p in candidates if include_spec.match_file(p) and not exclude_spec.match_file(p)
-    )
-
-
-def _get_dockerignore_lines(
-    abs_path_to_build_dir: Path,
-    include_files: t.List[str],
-    exclude_files: t.List[str],
-) -> t.List[str]:
-    if len(include_files) == 0:
-        return [""]
-
-    dockerignore_lines = [
-        p.as_posix()
-        for p in _get_large_file_rel_paths(abs_path_to_build_dir, include_files, exclude_files)
-    ]
-    # dockerignore_lines = []
-
-    include_spec = PathSpec.from_lines("gitwildmatch", include_files)
-    exclude_spec = PathSpec.from_lines("gitwildmatch", exclude_files)
-
-    def add(abs_path_to_root_dir: Path):
-        for abs_path in abs_path_to_root_dir.glob("*"):
-            rel_path = abs_path.relative_to(abs_path_to_build_dir)
-
-            if rel_path.parts[0] == TMP_DIR_NAME:
+    def _traverse_files(
+        self, cond: t.Optional[t.Callable[[Path], bool]] = None
+    ) -> t.Generator[Path, t.Any, None]:
+        for p_abs in list(self.abs_path_to_build_dir.rglob("*")):
+            if p_abs.is_dir():
                 continue
 
-            rel_path_posix_str = rel_path.as_posix()
+            p_rel = p_abs.relative_to(self.abs_path_to_build_dir)
+            p_rel_posix = p_rel.as_posix()
+            if (
+                not self._include_spec.match_file(p_rel_posix)
+                or self._exclude_spec.match_file(p_rel_posix)
+                or (cond and not cond(p_abs))
+            ):
+                continue
 
-            if abs_path.is_dir():
-                if not (
-                    (
-                        include_spec.match_file(rel_path_posix_str)
-                        and not exclude_spec.match_file(rel_path_posix_str)
-                    )
-                    or any(
-                        PathSpec.from_lines("gitwildmatch", [rel_path_posix_str]).match_file(
-                            pattern
-                        )
-                        for pattern in include_files
-                    )
-                ):
-                    dockerignore_lines.append(rel_path_posix_str)
-                else:
-                    add(abs_path)
-            else:
-                if not include_spec.match_file(rel_path_posix_str) or exclude_spec.match_file(
-                    rel_path_posix_str
-                ):
-                    dockerignore_lines.append(rel_path_posix_str)
+            yield p_abs
 
-    add(abs_path_to_build_dir)
+    def _traverse_small_files(self) -> t.Generator[Path, t.Any, None]:
+        return self._traverse_files(
+            lambda p: p.stat(follow_symlinks=False).st_size
+            < constants.MIN_LARGE_FILE_SIZE_ON_BUILD
+        )
 
-    return dockerignore_lines
+    def _traverse_large_files(self) -> t.Generator[Path, t.Any, None]:
+        return self._traverse_files(
+            lambda p: p.stat(follow_symlinks=False).st_size
+            >= constants.MIN_LARGE_FILE_SIZE_ON_BUILD
+        )
 
 
-@contextmanager
-def _large_files_image(
-    abs_path_to_build_dir: Path, include_files: t.List[str], exclude_files: t.List[str]
-):
-    large_file_rel_paths = _get_large_file_rel_paths(
-        abs_path_to_build_dir, include_files, exclude_files
+def _convert_abs_link_src_to_rel(abs_path_to_link_src: Path, abs_path_to_link: Path) -> Path:
+    for parent in abs_path_to_link.parents:
+        if is_relative_to(abs_path_to_link_src, start=parent):
+            common_prefix = parent
+            break
+
+    pd_count = (
+        len(abs_path_to_link.relative_to(common_prefix).parts) - len(common_prefix.parts) - 1
     )
-    if len(large_file_rel_paths) > 0:
-        log_info("Create image with large files:")
-        for large_file_rel_path in large_file_rel_paths:
-            log_info(f" - {large_file_rel_path}")
-
-        with tempfile.TemporaryDirectory(prefix="tungsten-build-") as tmpdir_str:
-            large_files_image_name = "tungsten-lf-" + uuid4().hex[:7] + ":" + uuid4().hex[:7]
-            large_files_image_tar_path = Path(tmpdir_str) / "large-files-image.tar"
-            log_info("")
-            create_files_image_tarball(
-                large_files_image_name,
-                [abs_path_to_build_dir / p for p in large_file_rel_paths],
-                large_files_image_tar_path,
-                abs_path_to_build_dir,
-            )
-
-            log_info("")
-
-            log_info("Importing the image to docker")
-            load_docker_image_from_file(large_files_image_tar_path)
-            log_info("")
-            try:
-                yield (large_file_rel_paths, large_files_image_name)
-            finally:
-                remove_docker_image(large_files_image_name)
-    else:
-        yield ([], None)
+    return Path(*([".."] * pd_count + list(abs_path_to_link_src.relative_to(common_prefix).parts)))
