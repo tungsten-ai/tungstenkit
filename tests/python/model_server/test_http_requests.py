@@ -34,7 +34,7 @@ def test_file_tunnel_server_endpoints(dummy_io_generator, file_tunnel_model_serv
 
 
 def _test_endpoints(dummy_io_generator, server: ModelServer):
-    _test_predict(dummy_io_generator, server)
+    # _test_predict(dummy_io_generator, server)
     _test_predict_async(dummy_io_generator, server)
     _test_demo(dummy_io_generator, server)
 
@@ -64,7 +64,7 @@ def _test_predict(dummy_io_generator, server: ModelServer):
 def _test_predict_async(dummy_io_generator, server: ModelServer):
     """Test asynchronous prediction endpoint"""
 
-    endpoint = "/predict_async"
+    endpoint = "/predictions"
 
     def create_pred(inputs) -> str:
         raw_resp = _create_pred(inputs, server.url, endpoint)

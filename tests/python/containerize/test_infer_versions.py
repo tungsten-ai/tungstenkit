@@ -6,14 +6,16 @@ import pytest
 from packaging.version import Version
 
 from tungstenkit import exceptions
-from tungstenkit._internal.containerize.gpu_pkg_collections import (
+from tungstenkit._internal.containerize.dockerfile_generators.gpu_pkg_collections import (
     GPUPackageCollection,
     GPUPackageConstraint,
     GPUPackageRelease,
     gpu_pkg_collection_class_dict,
     supported_gpu_pkg_names,
 )
-from tungstenkit._internal.containerize.pkg_manager import PythonPackageManager
+from tungstenkit._internal.containerize.dockerfile_generators.pkg_manager import (
+    PythonPackageManager,
+)
 
 pkg_a_releases = [
     GPUPackageRelease(

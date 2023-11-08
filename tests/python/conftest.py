@@ -2,6 +2,7 @@ import atexit
 import os
 import shutil
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -13,10 +14,30 @@ os.environ["TUNGSTEN_CONFIG_DIR"] = config_dir
 atexit.register(shutil.rmtree, data_dir)
 atexit.register(shutil.rmtree, config_dir)
 
-# Patch max source file size
+# Prepare temporary files for building dummy model
+path_to_link_src_in_build_dir = Path(__file__).parent / "dummy_model_data" / "somedir" / "somefile"
+path_to_link_src_outside_build_dir = Path(tempfile.mkstemp()[1])
+path_to_link_src_outside_build_dir.write_text("hello world")
+path_to_link_in_build_dir = (
+    Path(__file__).parent / "dummy_model_data" / "somedir" / "symlink_abs_in_build_dir"
+)
+path_to_link_outside_build_dir = (
+    Path(__file__).parent / "dummy_model_data" / "somedir" / "symlink_abs_outside_build_dir"
+)
+if not path_to_link_in_build_dir.exists():
+    os.symlink(path_to_link_src_in_build_dir, path_to_link_in_build_dir)
+if path_to_link_outside_build_dir.exists():
+    os.remove(path_to_link_outside_build_dir)
+os.symlink(path_to_link_src_outside_build_dir, path_to_link_outside_build_dir)
+atexit.register(os.remove, path_to_link_src_outside_build_dir)
+atexit.register(os.remove, path_to_link_in_build_dir)
+atexit.register(os.remove, path_to_link_outside_build_dir)
+
+# Patch file size thresholds
 from tungstenkit._internal import constants  # noqa
 
 constants.MAX_SOURCE_FILE_SIZE = 10 * 1024
+constants.MIN_LARGE_FILE_SIZE_ON_BUILD = 10 * 1024
 
 
 # Load fixtures

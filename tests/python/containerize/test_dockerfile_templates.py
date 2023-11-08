@@ -12,7 +12,7 @@ import pytest
 from docker.errors import ImageNotFound
 from packaging.version import Version
 
-from tungstenkit._internal.containerize.dockerfiles import base_dockerfile
+from tungstenkit._internal.containerize.dockerfile_generators import base_dockerfile_generator
 from tungstenkit._internal.utils.context import change_workingdir
 
 UBUNTU_VERSIONS = ["18.04", "20.04", "22.04"]
@@ -56,7 +56,7 @@ def _build_jinja2_env():
         trim_blocks=True,
         lstrip_blocks=True,
         loader=jinja2.FileSystemLoader(
-            Path(base_dockerfile.__file__).parent / "templates", followlinks=True
+            Path(base_dockerfile_generator.__file__).parent / "templates", followlinks=True
         ),
     )
 
