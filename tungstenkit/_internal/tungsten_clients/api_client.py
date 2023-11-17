@@ -78,6 +78,15 @@ class TungstenAPIClient:
         _check_resp(resp, f.url, f"Project not found: '{project_full_slug}'")
         return schemas.Project.parse_raw(resp.text)
 
+    def create_project_for_current_user(self, req: schemas.ProjectCreate) -> schemas.Project:
+        f = furl(self.base_url)
+        f.path = f.path / API_BASE_STR / "user" / "projects"
+        data = req.json()
+        log_request(url=f.url, data=data, method="GET")
+        resp = self.sess.post(f.url, data=data, timeout=CONNECTION_TINEOUT)
+        _check_resp(resp, f.url, f"Failed to create a project: '{req.slug}'")
+        return schemas.Project.parse_raw(resp.text)
+
     def fetch_project_avatar(
         self, project_full_slug: str, avatar_url: t.Optional[str] = None
     ) -> storables.AvatarData:

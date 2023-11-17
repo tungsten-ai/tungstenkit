@@ -58,3 +58,15 @@ RE_TUNGSTEN_PROJECT_SLUG = r"^[a-z0-9_-]+$"
 RE_TUNGSTEN_NAMESPACE_SLUG = r"^[a-z0-9_-]+$"
 RE_TUNGSTEN_FULL_SLUG = r"^[a-z0-9_-]+\\/[a-z0-9_-]+$"
 RE_MODEL_VERSION = r"[\\x00-\\x7F]+"
+
+
+def validate_tungsten_project_slug(name: str) -> str:
+    if len(name) > 20:
+        raise exceptions.InvalidName(f"Too long project name: '{name}'. Max 20 characters.")
+    if len(name) == 0:
+        raise exceptions.InvalidName("Project name is empty.")
+    if re.match(RE_TUNGSTEN_PROJECT_SLUG, name):
+        return name
+    raise exceptions.InvalidName(
+        f"Invalid project name: '{name}'. Project name can contain only alphanumeric characters, '-', and '_'"  # noqa: E501
+    )

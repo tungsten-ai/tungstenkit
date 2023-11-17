@@ -1,4 +1,3 @@
-import tempfile
 import typing as t
 from pathlib import Path
 
@@ -68,16 +67,46 @@ class TungstenClient:
             self._server_metadata = self.api.get_server_metadata()
         return strip_scheme_in_http_url(self._server_metadata.registry_url)
 
+    def create_project(
+        self,
+        project_slug: str,
+        *,
+        description: t.Optional[str] = None,
+        nsfw: bool = False,
+        private: bool = False,
+        exists_ok: bool = False,
+    ) -> t.Optional[schemas.Project]:
+        # TODO validator
+        # Check if project exists
+        project_full_slug = self.username + "/" + project_slug
+        project_in_server = self.api.get_project(project_full_slug)
+        if project_in_server is not None:
+            if exists_ok:
+                return None
+            else:
+                raise exceptions.Conflict(f"Project '{project_full_slug}' already exists.")
+
+        self.api.create_project_for_current_user(
+            schemas.ProjectCreate(
+                slug=project_slug, description=description, nsfw=nsfw, public=not private
+            )
+        )
+
     def push_model(
         self,
         model_name: str,
         project_full_slug: str,
         version: t.Optional[str] = None,
     ) -> schemas.Model:
-        # Check if project exists
+        # TODO more validation
+        assert (
+            len(project_full_slug.split("/")) == 2
+        ), f"Invalid project full slug. Format: USERNAME/PROJECT_SLUG (e.g. {self.username}/test)"
+
+        # Create project if it doesn't exist
         project_in_server = self.api.get_project(project_full_slug)
         if project_in_server is None:
-            raise exceptions.NotFound(f"No project '{project_full_slug}' in {self.api.base_url}")
+            self.create_project(project_full_slug.split("/")[1])
 
         # Check version conflict
         if version:
@@ -107,13 +136,6 @@ class TungstenClient:
             )
             log_info("")
 
-            # if model.source_files and model.source_files.files:
-            #     source_files, skipped_source_files = self.api.upload_model_source_files(
-            #         project=project, files=model.source_files.files
-            #     )
-            # else:
-            #     source_files, skipped_source_files = [], []
-
             log_info(f"Creating a model in {self.api.base_url}")
             req = schemas.ModelCreate(
                 docker_image=f'{remote_docker_repo.split("/")[-1]}:{remote_docker_tag}',
@@ -127,20 +149,11 @@ class TungstenClient:
                 if model.gpu and model.gpu_mem_gb
                 else 0,
                 version=version,
-                # source_files=source_files,
-                # skipped_source_files=skipped_source_files,
-                vm="nvidia-l4",  # TODO update this later
+                vm="nvidia-l4" if model.gpu else "cpu",  # TODO update this later
             )
 
             model_in_server = self.api.create_model(project_full_slug=project_full_slug, req=req)
             log_debug("Response: " + str(model_in_server), pretty=False)
-
-            # if model.readme:
-            #     log_info("Updating the README")
-            #     self.api.update_model_readme(
-            #         project=project, version=model_in_server.version, readme=model.readme
-            #     )
-            #     log_info("")
 
         finally:
             docker_client.images.remove(image=f"{remote_docker_repo}:{remote_docker_tag}")
@@ -156,6 +169,12 @@ class TungstenClient:
     def pull_model(
         self, project_full_slug: str, model_version: t.Optional[str] = None
     ) -> storables.ModelData:
+        # TODO more validation
+        assert (
+            len(project_full_slug.split("/")) == 2
+        ), f"Invalid project full slug. Format: USERNAME/PROJECT_SLUG (e.g. {self.username}/test)"
+
+        # Check if project exists
         project_in_server = self.api.get_project(project_full_slug)
         if project_in_server is None:
             raise exceptions.NotFound(f"No project '{project_full_slug}' in {self.api.base_url}")
@@ -183,53 +202,29 @@ class TungstenClient:
         image.tag(project_full_slug, model_version)
         docker_client.images.remove(remote_docker_repo + ":" + tag)
 
-        with tempfile.TemporaryDirectory() as tmp_dir_str:
-            tmp_dir = Path(tmp_dir_str)
+        readme, source_files = None, []
 
-            # if model_in_server.readme_url:
-            #     readme_image_dir = tmp_dir / "readme_images"
-            #     readme_image_dir.mkdir()
-            #     log_info("Fetching the README")
-            #     readme = self.api.get_model_readme(
-            #         project=project, version=model_version, image_download_dir=tmp_dir
-            #     )
-            #     log_info("")
-            # else:
-            #     readme = None
+        avatar = self.api.fetch_project_avatar(project_full_slug, project_in_server.avatar_url)
+        io_data = storables.ModelIOData(
+            input_schema=model_in_server.input_schema,
+            output_schema=model_in_server.output_schema,
+            demo_output_schema=model_in_server.demo_output_schema,
+            input_filetypes=model_in_server.input_filetypes,
+            output_filetypes=model_in_server.output_filetypes,
+            demo_output_filetypes=model_in_server.demo_output_filetypes,
+        )
+        m = storables.ModelData(
+            name=local_model_name,
+            io_data=io_data,
+            avatar=avatar,
+            readme=readme,
+            source_files=source_files,
+        )
+        m.save(file_blob_create_policy="rename")
 
-            # if model_in_server.source_files_count > 0:
-            #     source_files_dir = tmp_dir / "source_files"
-            #     source_files_dir.mkdir()
-            #     log_info("Fetching source files")
-            #     source_files = self.api.download_model_source_tree(
-            #         project=project, version=model_version, root_dir=source_files_dir
-            #     )
-            # else:
-            #     source_files = []
-
-            readme, source_files = None, []
-
-            avatar = self.api.fetch_project_avatar(project_full_slug, project_in_server.avatar_url)
-            io_data = storables.ModelIOData(
-                input_schema=model_in_server.input_schema,
-                output_schema=model_in_server.output_schema,
-                demo_output_schema=model_in_server.demo_output_schema,
-                input_filetypes=model_in_server.input_filetypes,
-                output_filetypes=model_in_server.output_filetypes,
-                demo_output_filetypes=model_in_server.demo_output_filetypes,
-            )
-            m = storables.ModelData(
-                name=local_model_name,
-                io_data=io_data,
-                avatar=avatar,
-                readme=readme,
-                source_files=source_files,
-            )
-            m.save(file_blob_create_policy="rename")
-
-            log_info("")
-            print_success(f"Successfully pulled '{project_full_slug}:{model_version}'")
-            return storables.ModelData.load(local_model_name)
+        log_info("")
+        print_success(f"Successfully pulled '{project_full_slug}:{model_version}'")
+        return storables.ModelData.load(local_model_name)
 
     def _push_to_docker_registry(self, repo: str, tag: str, docker_client: DockerClient):
         result = push_to_docker_registry(repo=repo, tag=tag, docker_client=docker_client)

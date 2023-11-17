@@ -12,6 +12,7 @@ from tungstenkit._versions import pkg_version
 from .login_command import login
 from .model_commands import list_models, model
 from .options import common_options
+from .project_commands import project
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -45,11 +46,13 @@ def main():
             cli.add_command(cmd, "models")
         else:
             cli.add_command(cmd, name)
+    cli.add_command(project, "project")
     cli()
 
 
 def _excepthook(exctype, value, tb):
     log_exception(exctype=exctype, exc=value, tb=tb, show_tungsten_exc_tb=False)
+
 
 if __name__ == "__main__":
     main()

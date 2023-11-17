@@ -11,7 +11,7 @@ from .options import common_options
 
 
 def _check_email(email: str):
-    return bool(re.findall(r"^\w+[@]\w+[.]\w+$", email))
+    return bool(re.findall(r"^[.\w_-]+[@][\w_-]+(?:[.][\w_-]+)+$", email))
 
 
 def _check_username(username: str):

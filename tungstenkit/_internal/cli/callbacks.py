@@ -83,3 +83,7 @@ def input_fields_callback(ctx, param, input_fields: t.Tuple[str]) -> t.List[t.Tu
 
 def model_name_validator(ctx, param, name: Optional[str]) -> t.Optional[str]:
     return regex.validate_docker_image_name(name) if name else None
+
+
+def project_slug_validator(ctx, param, slug: str) -> str:
+    return regex.validate_tungsten_project_slug(slug)

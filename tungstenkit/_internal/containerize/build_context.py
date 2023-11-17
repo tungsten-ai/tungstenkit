@@ -175,20 +175,10 @@ class BuildContext:
         subprocess_args = [
             "docker",
             "build",
-<<<<<<< Updated upstream
             "--cache-to=type=inline",
             f"--tag={tag}",
             "--file=" + str(self._rel_path_to_dockerfile),
             "--output=type=docker,push=false",
-||||||| constructed merge base
-            f"--tag={tag}",
-            "--cache-to=type=inline",
-            "--file=" + str(self.dockerfile_path.relative_to(self.root_dir)),
-            "--output=type=docker,compression=zstd,force-compression=true,push=false",
-=======
-            f"--tag={tag}",
-            "--file=" + str(self._rel_path_to_dockerfile),
->>>>>>> Stashed changes
         ]
         subprocess_args.append(str(self.abs_path_to_build_dir))
         log_debug(msg="$ " + " ".join(subprocess_args), pretty=False)

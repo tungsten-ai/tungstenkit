@@ -292,6 +292,14 @@ class MaskedImage(BaseIO):
             raise ValueError("Mask size is different to the image's")
         return Image.from_pil_image(pil_mask)
 
+    if contexts.APP not in [contexts.Application.MODEL_SERVER, contexts.Application.TASK_SERVER]:
+
+        @classmethod
+        def __modify_schema__(
+            cls, field_schema: t.Dict[str, t.Any], field: t.Optional[ModelField]
+        ):
+            field_schema["$ref"] = "/schemas/v1/io.json#/definitions/MaskedImage"
+
 
 def filetype_to_cls(filetype: FileType) -> t.Type[File]:
     for cls in File.__subclasses__():

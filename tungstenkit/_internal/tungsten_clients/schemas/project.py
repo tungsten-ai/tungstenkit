@@ -31,3 +31,10 @@ class Project(BaseModel):
     last_model_uploaded_at: Optional[datetime] = None
 
     access_level: Optional[int] = None
+
+
+class ProjectCreate(BaseModel):
+    slug: str
+    description: Optional[str] = None
+    public: bool = True
+    nsfw: bool = False

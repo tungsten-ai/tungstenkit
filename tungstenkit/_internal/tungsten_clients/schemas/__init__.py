@@ -17,6 +17,6 @@ from .model import (
     SourceTreeFile,
     SourceTreeFolder,
 )
-from .project import Project
+from .project import Project, ProjectCreate
 from .token import AccessToken
 from .user import User
