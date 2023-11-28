@@ -64,8 +64,6 @@ class Model(BaseModel):
 
     readme_url: Optional[str]
 
-    source_files_count: int
-
     creator: ModelCreator
     created_at: datetime
 
