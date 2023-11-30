@@ -7,8 +7,11 @@ import sys
 import types
 from collections import namedtuple
 from contextlib import contextmanager
+from pathlib import Path
 from types import ModuleType
-from typing import Dict, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set
+
+from .file import is_relative_to
 
 Import = namedtuple("Import", ["module", "name", "alias"])
 
@@ -163,28 +166,56 @@ def get_imports(path):
 
 
 @contextmanager
-def lazy_import_ctx(imports: List[Import], help_msg_on_err: Optional[str] = None):
+def lazy_import_ctx(imports: Iterable[Import], root: Path, help_msg_on_err: Optional[str] = None):
     loader = UnknownModuleLazyLoader(help_msg_on_err)
     finder = UnknownModuleFinder(loader)
-    try:
-        sys.meta_path.insert(0, finder)
-        for imp in imports:
+
+    visited = []
+
+    def _lazy_import(_imports: Iterable[Import]):
+        for imp in _imports:
+            module_name = ".".join(imp.module) if imp.module else ".".join(imp.name)
+            submodule_name = "." + ".".join(imp.name) if imp.module else ""
+            module_key = module_name + submodule_name
+            if module_key in visited:
+                continue
+            else:
+                visited.append(module_key)
+
             try:
-                mod = importlib.import_module(
-                    ".".join(imp.module) if imp.module else ".".join(imp.name)
-                )
+                mod = importlib.import_module(module_name)
                 if isinstance(mod, UnknownModule):
                     if imp.module:
                         attr_name = ".".join(imp.name)
                         loader.register(".".join(imp.module), attr_name if attr_name else None)
                     else:
                         loader.register(".".join(imp.name))
+                else:
+                    spec = importlib.util.find_spec(module_name)
+                    assert spec is not None
+                    if spec.origin is None:
+                        raise ModuleNotFoundError(f"Cannot find origin of module {module_name}")
+
+                    if is_relative_to(Path(spec.origin), Path(root)):
+                        imports_nested = list(get_imports(spec.origin))
+                        _lazy_import(imports_nested)
+                        if imp.module and imp.name:
+                            submodule_name = module_name + "." + ".".join(imp.name)
+                            spec = importlib.util.find_spec(submodule_name)
+                            if spec:
+                                submodule_imports_nested = list(get_imports(spec.origin))
+                                _lazy_import(submodule_imports_nested)
+
             except Exception:
                 if imp.module:
                     attr_name = ".".join(imp.name)
                     loader.register(".".join(imp.module), attr_name if attr_name else None)
                 else:
                     loader.register(".".join(imp.name))
+
+    try:
+        sys.meta_path.insert(0, finder)
+        _lazy_import(imports)
         yield
     finally:
         for module_name in loader._registered.keys():
@@ -205,8 +236,8 @@ def import_module_in_lazy_import_ctx(
         raise ModuleNotFoundError(
             f"Failed to initialize module '{module}'. Is it a Python module?"
         )
-    imports = get_imports(spec.origin)
-    with lazy_import_ctx(imports, help_msg_on_unknown_module_exec):
+    imports = list(get_imports(spec.origin))
+    with lazy_import_ctx(imports, Path(spec.origin).parent, help_msg_on_unknown_module_exec):
         mod = importlib.import_module(module)
         return mod
 
