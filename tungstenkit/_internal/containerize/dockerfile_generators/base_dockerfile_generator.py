@@ -115,25 +115,17 @@ class BaseDockerfileGenerator(metaclass=abc.ABCMeta):
         py_pkg_manager.set_python_equal_to(py_ver)
 
         # Prepare requirements.txt and pip install commands
-        list_pip_install_args = []
         requirements_txt = RequirementsTxt()
 
         gpu_pkg_requirements = py_pkg_manager.list_gpu_pkg_pip_requirements()
-        for r in gpu_pkg_requirements:
-            list_pip_install_args.append(r.to_str().split(" "))
-
         extra_pkg_requirements = py_pkg_manager.list_extra_pkg_pip_requirements()
-        for r in extra_pkg_requirements:
-            if r.index_url:
-                list_pip_install_args.append(r.to_str().split(" "))
-            else:
-                requirements_txt.add_requirement(r)
+        for r in gpu_pkg_requirements + extra_pkg_requirements:
+            requirements_txt.add_requirement(r)
 
         requirements_txt_content = requirements_txt.build()
         (abs_path_to_build_dir / rel_path_to_pip_requirements_txt).write_text(
             requirements_txt_content
         )
-        log_debug("pip install args: " + str(list_pip_install_args), pretty=False)
         log_debug("python requirements.txt:\n" + requirements_txt_content, pretty=False)
 
         # Set base image
@@ -157,10 +149,6 @@ class BaseDockerfileGenerator(metaclass=abc.ABCMeta):
             python_image_collection = PythonImageCollection.from_remote()
             image = python_image_collection.get_py_image_by_ver(py_ver)
 
-        # large_files, small_files = self.split_large_and_small_files(
-        #     Path("."), tmp_dir_in_build_ctx
-        # )
-
         template_args = TemplateArgs(
             image=image,
             large_file_rel_paths=rel_paths_to_large_files,
@@ -168,7 +156,6 @@ class BaseDockerfileGenerator(metaclass=abc.ABCMeta):
             python_version=py_ver,
             python_entrypoint=self.python_entrypoint(),
             pip_requirements_txt_in_build_ctx=rel_path_to_pip_requirements_txt,
-            list_pip_install_args=list_pip_install_args,
             system_packages=self.config.system_packages,
             pip_wheels_in_build_ctx=self.config.pip_wheels,
             env_vars=self.config.environment_variables,
