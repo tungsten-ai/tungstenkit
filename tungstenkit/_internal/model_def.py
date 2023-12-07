@@ -1,6 +1,8 @@
+import functools
 import inspect
 import typing as t
 
+from packaging.version import Version
 from typing_extensions import Protocol
 
 from tungstenkit import BaseIO
@@ -11,11 +13,29 @@ from tungstenkit._internal.io_schema import (
     validate_output_class,
 )
 from tungstenkit._internal.utils import types as type_utils
+from tungstenkit._versions import py_version
 
 DEFINED_MODEL_SET: t.Set[type] = set()
 
 
 C = t.TypeVar("C", bound=type)
+
+
+class StaticMethod:
+    "Emulate PyStaticMethod_Type() in Objects/funcobject.c"
+
+    def __init__(self, f):
+        self.f = f
+        functools.update_wrapper(self, f)
+
+    def __get__(self, obj, objtype=None):
+        return self.f
+
+    def __call__(self, *args, **kwds):
+        return self.f(*args, **kwds)
+
+    def __name__(self):
+        self.f.__name__
 
 
 class TungstenModel(Protocol):
@@ -25,7 +45,8 @@ class TungstenModel(Protocol):
     __tungsten_demo_output__: t.Type[BaseIO]
     __has_post_build__: bool
 
-    def post_build(self):
+    @staticmethod
+    def post_build():
         ...
 
     def setup(self):
@@ -270,7 +291,9 @@ class _ClassBuilder:
         return self._cls
 
     def _set_default_post_build(self):
-        @staticmethod
+        deco = staticmethod if py_version >= Version("3.10") else StaticMethod
+
+        @deco
         def post_build():
             pass
 
