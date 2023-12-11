@@ -82,9 +82,9 @@ def containerize_model(
                     input_schema=input_schema,
                     output_schema=output_schema,
                     demo_output_schema=demo_output_schema,
-                    input_filetypes=model_build_config.input_filetypes,
-                    output_filetypes=model_build_config.output_filetypes,
-                    demo_output_filetypes=model_build_config.demo_output_filetypes,
+                    input_annotations=model_build_config.input_annotations,
+                    output_annotations=model_build_config.output_annotations,
+                    demo_output_annotations=model_build_config.demo_output_annotations,
                 )
                 avatar = storables.AvatarData.fetch_default(hash_key=model_name)
                 if model_build_config.readme_md:

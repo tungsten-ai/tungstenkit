@@ -26,7 +26,7 @@ from rich.progress import (
 from tungstenkit._versions import pkg_version
 
 from .context import change_workingdir
-from .file import is_relative_to
+from .file import get_file_size, is_relative_to
 
 READ_BLOCK_SIZE = 5 * 1024 * 1024  # 5MB
 PBAR_PATH_LENGTH = 21
@@ -207,7 +207,9 @@ def create_files_image_tarball(
     image_tar_path = image_tar_path.absolute()
 
     # Largest file first in the output docker image
-    absolute_file_paths = sorted(absolute_file_paths, key=lambda p: p.stat().st_size, reverse=True)
+    absolute_file_paths = sorted(
+        absolute_file_paths, key=lambda p: get_file_size(p, follow_symlinks=False), reverse=True
+    )
     relative_file_paths = [p.relative_to(base_dir) for p in absolute_file_paths]
     files_count = len(absolute_file_paths)
 
@@ -341,7 +343,7 @@ def create_files_image_tarball(
                         all_file_paths = list(p for p in Path().rglob("*") if not p.is_dir())
                         for file_idx in range(len(all_file_paths)):
                             path = all_file_paths[file_idx]
-                            filesize = path.stat().st_size
+                            filesize = get_file_size(path, follow_symlinks=False)
 
                             with path.open("rb") as fp:
                                 fut = worker.submit(tf.addfile, tf.gettarinfo(str(path)), fp)
@@ -383,7 +385,7 @@ def _create_file_layer_directory_and_tar_file(
     tmp_tar_dir = image_base_dir / str(layer_idx)
     tmp_tar_dir.mkdir(exist_ok=True, parents=True)
     tmp_tar_path = tmp_tar_dir / "layer.tar"
-    file_stat = file_path.stat()
+    file_stat = file_path.lstat() if file_path.is_symlink() else file_path.stat()
     truncated_path_str = _formatted_path(file_path)
     progress.update(
         progress_task_id,

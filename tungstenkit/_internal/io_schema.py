@@ -21,7 +21,16 @@ SUPPORTED_INPUT_TYPES: t.List[t.Type] = [
     io.MaskedImage,
 ]
 SUPPORTED_OUTPUT_COMPOSITE_TYPES: t.List[t.Type] = [io.BaseIO, list, dict]
-SUPPORTED_OUTPUT_PRIMARY_TYPES = SUPPORTED_INPUT_TYPES
+SUPPORTED_OUTPUT_PRIMARY_TYPES = [
+    int,
+    float,
+    str,
+    bool,
+    io.Image,
+    io.Video,
+    io.Audio,
+    io.Binary,
+]
 SUPPORTED_DICT_KEY_TYPES: t.List[t.Type] = [str, bool, int]
 SUPPORTED_OUTPUT_TYPES = SUPPORTED_OUTPUT_PRIMARY_TYPES + SUPPORTED_OUTPUT_COMPOSITE_TYPES
 
@@ -47,6 +56,7 @@ def validate_input_class(input_cls: t.Type):
         valid = False
 
         if (
+            # Optional field allowing None
             not field.required
             and is_union(origin)
             and sum(is_none_type(arg) for arg in type_args) == 1
@@ -115,6 +125,11 @@ def validate_output_class(output_cls: t.Type):
         origin = get_type_origin(type_)
         type_args = get_type_args(type_)
 
+        if is_union(origin):
+            unsupported_field = True
+            invalid_types_and_reasons[field_name] = (type_, "union is not supported")
+            return
+
         if not inspect.isclass(origin):
             unsupported_field = True
             invalid_types_and_reasons[field_name] = (type_, "unsupported output type")
@@ -124,15 +139,12 @@ def validate_output_class(output_cls: t.Type):
             if issubclass(origin, supported_output_type):
                 return
 
-        def set_no_type_args_err():
-            invalid_types_and_reasons[field_name] = (
-                type_,
-                "no type argument",
-            )
-
         if issubclass(origin, list):
             if len(type_args) == 0:
-                set_no_type_args_err()
+                invalid_types_and_reasons[field_name] = (
+                    type_,
+                    "no type argument",
+                )
             else:
                 validate_type(type_args[0], field_name + ".<'item'>")
 
@@ -189,23 +201,23 @@ def validate_output_class(output_cls: t.Type):
 validate_demo_output_class = validate_output_class
 
 
-def get_filetypes(io_cls: t.Type[io.BaseIO]) -> t.Dict[str, io.FileType]:
+def get_annotations(io_cls: t.Type[io.BaseIO]) -> t.Dict[str, io.FieldAnnotation]:
     """
-    Returns a dict mapping from "json index" to ``FileType``.
+    Returns a dict mapping from "json index" to ``FileAnnotation``.
     For example,
     ```
     {
-        "image": FileType.Image,
-        "nested.image": Filetype.Image,
-        "somedict.$item": FileType.Image,
-        "somelist.$item": FileType.Image,
+        "image": FileAnnotation.image,
+        "nested.image": Filetype.image,
+        "somedict.$item": FileAnnotation.image,
+        "somelist.$item": FileAnnotation.image,
     }
     ```
     """
 
-    ret: t.Dict[str, io.FileType] = dict()
+    ret: t.Dict[str, io.FieldAnnotation] = dict()
 
-    def _get_filetypes(type_: type, json_index: str):
+    def _get_annotations(type_: type, json_index: str):
         origin = get_type_origin(type_)
         type_args = get_type_args(type_)
 
@@ -222,29 +234,21 @@ def get_filetypes(io_cls: t.Type[io.BaseIO]) -> t.Dict[str, io.FileType]:
         if not inspect.isclass(origin):
             return
 
-        if issubclass(origin, io.File):
-            ret[json_index] = origin._get_typeenum()
+        if issubclass(origin, io.AnnotatedField):
+            ret[json_index] = origin._get_annotation()
 
         elif issubclass(origin, list):
-            _get_filetypes(type_args[0], json_index=json_index + ".$item")
+            _get_annotations(type_args[0], json_index=json_index + ".$item")
 
         elif issubclass(origin, dict):
-            _get_filetypes(type_args[1], json_index=json_index + ".$item")
+            _get_annotations(type_args[1], json_index=json_index + ".$item")
 
         elif issubclass(origin, io.BaseIO):
             for field_name, type_ in t.get_type_hints(origin).items():
                 field_index = json_index + "." + field_name if json_index else field_name
-                _get_filetypes(type_, field_index)
+                _get_annotations(type_, field_index)
 
-    _get_filetypes(io_cls, "")
-    return ret
-
-
-def get_files_in_input_json(input_json: t.Dict, filefield_names: t.List[str]) -> t.Dict:
-    ret = dict()
-    for k, v in input_json.items():
-        if k in filefield_names:
-            ret[k] = v
+    _get_annotations(io_cls, "")
     return ret
 
 

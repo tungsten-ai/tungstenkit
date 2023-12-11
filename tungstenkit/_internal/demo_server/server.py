@@ -15,6 +15,7 @@ from tungstenkit._internal.containers import ModelContainer, start_model_contain
 from tungstenkit._internal.model_clients import ModelContainerClient
 
 from . import schemas
+from .model_validation import validate_model
 from .services import FileService, PredictionService
 
 # TODO https
@@ -26,6 +27,9 @@ frontend_dir_in_pkg = Path(__file__).parent / "frontend"
 def start_demo_server(model_data: storables.ModelData, tmp_dir: Path, host: str, port: int):
     # NOTE We create tempdir in current directory since docker desktop doesn't allow
     # to bind host dirs outside the user home directory
+
+    validate_model(model_data)
+
     with tempfile.TemporaryDirectory(
         prefix=".tungsten-container-volume-",
         dir=".",
@@ -75,7 +79,7 @@ def _add_api_endpoints(
         file_service=file_service,
         model_client=model_client,
         input_schema=model_data.io.input_schema,
-        input_filetypes=model_data.io.input_filetypes,
+        input_filetypes=model_data.io.input_annotations,
     )
 
     # Start garbage collection

@@ -28,8 +28,8 @@ class LocalModel(PredInterface):
 
     def _convert_input_files_to_urls(self, input: t.Dict) -> t.Dict:
         ret = input.copy()
-        input_filetypes = self._data.io.input_filetypes
-        for field_name in input_filetypes.keys():
+        input_annotations = self._data.io.input_annotations
+        for field_name in input_annotations.keys():
             if field_name in ret:
                 uri = build_uri_for_file(input[field_name])
                 if check_if_http_or_https_uri(uri):

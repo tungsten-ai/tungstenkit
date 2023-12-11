@@ -137,7 +137,10 @@ class BlobStore:
             return self.get_by_digest(digest)
         blob_dir = _build_blob_dir_path(digest)
         blob_dir.mkdir(parents=True)
-        os.replace(path.resolve(), blob_dir / path.name)
+        try:
+            os.replace(path.resolve(), blob_dir / path.name)
+        except Exception:
+            shutil.move(str(path.resolve()), str(blob_dir / path.name))
         return Blob(digest=digest, file_name=path.name)
 
     def delete_unused(self, used: t.Set[Blob]) -> None:
@@ -210,7 +213,10 @@ def _write_blob(blob_dir: Path, file_name: str, path_or_bytes: t.Union[Path, byt
             tmp_file_path.write_bytes(path_or_bytes)
         else:
             shutil.copyfile(path_or_bytes.resolve(), tmp_file_path)
-        os.replace(tmp_file_path, blob_file_path)
+        try:
+            os.replace(tmp_file_path, blob_file_path)
+        except Exception:
+            shutil.move(str(tmp_file_path), str(blob_file_path))
     except BaseException as e:
         shutil.rmtree(str(blob_dir))
         raise e

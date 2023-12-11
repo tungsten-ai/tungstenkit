@@ -11,8 +11,8 @@ from tabulate import tabulate
 from tungstenkit._internal import model_store
 from tungstenkit._internal.constants import (
     DEFAULT_MODEL_MODULE,
-    TUNGSTEN_DIR_IN_CONTAINER,
     TUNGSTEN_LOGO,
+    WORKING_DIR_IN_CONTAINER,
 )
 from tungstenkit._internal.containerize import containerize_model
 from tungstenkit._internal.demo_server import start_demo_server
@@ -316,7 +316,7 @@ def predict(model_name: str, input: t.Iterable[t.Tuple[str, str]], output_file_d
     "-d",
     default=".",
     show_default=True,
-    type=click.Path(exists=True, dir_okay=True, file_okay=False, writable=True),
+    type=click.Path(dir_okay=True, file_okay=False, writable=True),
     help="Directory to save files",
 )
 @common_options
@@ -328,7 +328,7 @@ def extract(model_name: str, save_dir: str, **kwargs):
     """
     model_data = model_store.get(model_name)
     docker_client.copy_from_image(
-        model_data.id, TUNGSTEN_DIR_IN_CONTAINER, Path(save_dir), image_desc=model_data.name
+        model_data.name, WORKING_DIR_IN_CONTAINER, Path(save_dir), image_desc=model_data.name
     )
 
 

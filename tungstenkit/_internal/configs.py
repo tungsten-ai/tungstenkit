@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import typing as t
 from pathlib import Path
@@ -13,8 +14,8 @@ from tungstenkit._internal.constants import (
     MAX_SUPPORTED_PYTHON_VER,
     MIN_SUPPORTED_PYTHON_VER,
 )
-from tungstenkit._internal.io import BaseIO, FileType
-from tungstenkit._internal.io_schema import get_filetypes
+from tungstenkit._internal.io import BaseIO, FieldAnnotation
+from tungstenkit._internal.io_schema import get_annotations
 from tungstenkit.exceptions import NotLoggedIn
 
 CONFIG_PATH = CONFIG_DIR / "config.json"
@@ -112,27 +113,27 @@ class ModelBuildConfig(BuildConfig):
     input_schema: t.Dict
     output_schema: t.Dict
     demo_output_schema: t.Dict
-    input_filetypes: t.Dict[str, FileType]
-    output_filetypes: t.Dict[str, FileType]
-    demo_output_filetypes: t.Dict[str, FileType]
+    input_annotations: t.Dict[str, FieldAnnotation]
+    output_annotations: t.Dict[str, FieldAnnotation]
+    demo_output_annotations: t.Dict[str, FieldAnnotation]
     has_post_build: bool
 
     @classmethod
     def with_types(
         cls, input_cls: t.Type[BaseIO], output_cls: t.Type[BaseIO], demo_output_cls: t.Type[BaseIO]
     ):
-        input_filetypes = get_filetypes(input_cls)
-        output_filetypes = get_filetypes(output_cls)
-        demo_output_filetypes = get_filetypes(demo_output_cls)
+        input_annotations = get_annotations(input_cls)
+        output_annotations = get_annotations(output_cls)
+        demo_output_annotations = get_annotations(demo_output_cls)
         return create_model(
             cls.__name__,
             __base__=cls,
             input_schema=(t.Dict, Field(default_factory=input_cls.schema)),
             output_schema=(t.Dict, Field(default_factory=output_cls.schema)),
             demo_output_schema=(t.Dict, Field(default_factory=demo_output_cls.schema)),
-            input_filetypes=(t.Dict, Field(default=input_filetypes)),
-            output_filetypes=(t.Dict, Field(default=output_filetypes)),
-            demo_output_filetypes=(t.Dict, Field(default=demo_output_filetypes)),
+            input_annotations=(t.Dict, Field(default=input_annotations)),
+            output_annotations=(t.Dict, Field(default=output_annotations)),
+            demo_output_annotations=(t.Dict, Field(default=demo_output_annotations)),
         )
 
     @validator("readme_md")
@@ -161,7 +162,10 @@ class TungstenClientConfig(BaseModel):
             with FileLock(lock_path, timeout=30.0):
                 tmp_config_path.write_text(dumped)
                 os.close(tmp_config_fd)
-                os.replace(tmp_config_path, path)
+                try:
+                    os.replace(tmp_config_path, path)
+                except Exception:
+                    shutil.move(str(tmp_config_path), str(path))
         finally:
             try:
                 os.close(tmp_config_fd)

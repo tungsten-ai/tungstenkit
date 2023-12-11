@@ -67,7 +67,7 @@ def dummy_model_in_server(
         version=MODEL_VERSION,
         docker_image=PROJECT_FULLNAME + ":" + MODEL_VERSION,
         docker_image_size=image_size,
-        input_schema=dummy_model_data.io.input_schema,
+        input_filetypes=dummy_model_data.io.input_schema,
         output_schema=dummy_model_data.io.output_schema,
         demo_output_schema=dummy_model_data.io.demo_output_schema,
         input_filetypes=dummy_model_data.io.input_filetypes,

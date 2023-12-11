@@ -53,7 +53,7 @@ def convert_to_unique_path(path: Path) -> Path:
 def get_tree_size_in_bytes(root_dir: Path, ignore_patterns: t.Optional[t.List[str]] = None) -> int:
     ignore_spec = PathSpec.from_lines("gitwildmatch", ignore_patterns) if ignore_patterns else None
     return sum(
-        (f.stat().st_size if f.is_file() else f.lstat().st_size)
+        get_file_size(f, follow_symlinks=False)
         for f in root_dir.glob("**/*")
         if (f.is_symlink() or f.is_file())
         and (ignore_spec is None or not ignore_spec.match_file(f.as_posix()))
@@ -81,7 +81,10 @@ def write_safely(path: Path, content: t.Union[str, bytes]) -> None:
         else:
             tmp_path.write_bytes(content)
         os.close(fd)
-        os.replace(tmp_path, path)
+        try:
+            os.replace(tmp_path, path)
+        except Exception:
+            shutil.move(str(tmp_path), str(path))
     finally:
         try:
             os.close(fd)
@@ -112,3 +115,9 @@ def copy_multiple_files(files: t.List[Path], directory: Path) -> t.List[Path]:
             ret.append(Path(fut.result()))
 
     return ret
+
+
+def get_file_size(p: Path, follow_symlinks: bool = False) -> int:
+    if not follow_symlinks and p.is_symlink():
+        return p.lstat().st_size
+    return p.stat().st_size

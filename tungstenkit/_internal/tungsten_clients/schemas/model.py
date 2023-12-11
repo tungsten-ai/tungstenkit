@@ -1,8 +1,10 @@
 from datetime import datetime
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import Literal
+
+from tungstenkit._versions import pkg_version
 
 
 class SourceFileDecl(BaseModel):
@@ -16,6 +18,8 @@ class SkippedSourceFileDecl(BaseModel):
 
 
 class ModelCreate(BaseModel):
+    version: Optional[str] = None
+
     docker_image: str
 
     input_schema: dict
@@ -26,12 +30,13 @@ class ModelCreate(BaseModel):
     output_filetypes: dict
     demo_output_filetypes: dict
 
-    source_files: List[SourceFileDecl] = Field(default_factory=list)
-    skipped_source_files: List[SkippedSourceFileDecl] = Field(default_factory=list)
-
     gpu_memory: int
-    vm: Optional[str] = None
-    version: Optional[str] = None
+    vm: str
+
+    os: str = "linux"
+    architecture: str = "amd64"
+
+    sdk_version: str = str(pkg_version)
 
 
 class ModelCreator(BaseModel):

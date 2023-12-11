@@ -55,9 +55,9 @@ class Metadata(BaseModel):
             input_schema=model.io.input_schema,
             output_schema=model.io.output_schema,
             demo_output_schema=model.io.demo_output_schema,
-            input_filetypes=model.io.input_filetypes,
-            output_filetypes=model.io.output_filetypes,
-            demo_output_filetypes=model.io.demo_output_filetypes,
+            input_filetypes=model.io.input_annotations,
+            output_filetypes=model.io.output_annotations,
+            demo_output_filetypes=model.io.demo_output_annotations,
         )
 
 

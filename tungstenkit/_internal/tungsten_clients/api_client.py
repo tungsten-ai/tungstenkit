@@ -1,6 +1,6 @@
 import io
 import typing as t
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import requests
 from furl import furl
@@ -29,7 +29,7 @@ if t.TYPE_CHECKING:
     from _typeshed import StrPath
 
 API_BASE_STR = "/v1"
-CONNECTION_TINEOUT = 10
+CONNECTION_TINEOUT = 15
 
 
 class TungstenAPIClient:
@@ -192,99 +192,6 @@ class TungstenAPIClient:
             return storables.MarkdownData(content=md, image_files=downloaded)
         return storables.MarkdownData(content=md)
 
-    def get_model_source_tree(
-        self, project_full_slug: str, version: str
-    ) -> schemas.SourceTreeFolder:
-        f = furl(self.base_url)
-        f.path = (
-            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "tree"
-        )
-        log_request(url=f.url, method="GET")
-        resp = self.sess.get(f.url, timeout=CONNECTION_TINEOUT)
-        _check_resp(
-            resp,
-            url=f.url,
-            err_msg_prefix=f"Failed to get the source tree of model {project_full_slug}:{version}",
-        )
-        parsed = schemas.SourceTreeFolder.parse_raw(resp.text)
-        return parsed
-
-    def download_model_source_file(
-        self, project_full_slug: str, version: str, path: str, root_dir: Path
-    ) -> Path:
-        download_dir = (root_dir / path).parent
-        download_dir.mkdir(exist_ok=True, parents=True)
-
-        f = furl(self.base_url)
-        f.path = (
-            f.path / API_BASE_STR / "projects" / project_full_slug / "models" / version / "files"
-        )
-        f.path.segments += [path]  # For url encoding
-        log_request(url=f.url, method="GET")
-        return download_file(url=f.url, out_path=download_dir, sess=self.sess)
-
-    def download_model_source_tree(
-        self, project_full_slug: str, version: str, root_dir: Path
-    ) -> t.List[storables.SourceFile]:
-        root = self.get_model_source_tree(project_full_slug=project_full_slug, version=version)
-        urls: t.List[str] = []
-        download_paths: t.List[Path] = []
-        ret: t.List[storables.SourceFile] = []
-
-        def _add(path: t.Optional[PurePosixPath], folder: schemas.SourceTreeFolder):
-            contents = folder.contents
-            for c in contents:
-                p = path / c.name if path else PurePosixPath(c.name)
-                if c.type == "file":
-                    if c.skipped:
-                        downloaded = None
-                    else:
-                        if path is None:
-                            downloaded = root_dir / c.name
-                        else:
-                            downloaded = root_dir / path / c.name
-
-                        urls.append(
-                            self._build_source_file_url(project_full_slug, version, str(p))
-                        )
-                        download_paths.append(downloaded)
-
-                    ret.append(
-                        storables.SourceFile(
-                            rel_path_in_model_fs=p,
-                            abs_path_in_host_fs=downloaded,
-                            size=c.size,
-                        )
-                    )
-                else:
-                    _add(p, c)
-
-        _add(None, root)
-        self.download_multiple_files(urls, download_paths)
-        return ret
-
-    def upload_model_source_files(
-        self, project_full_slug: str, files: t.Iterable[storables.SourceFile]
-    ) -> t.Tuple[t.List[schemas.SourceFileDecl], t.List[schemas.SkippedSourceFileDecl]]:
-        source_files, skipped_source_files = [], []
-        upload_path_dict = {f: f.abs_path_in_host_fs for f in files if f.abs_path_in_host_fs}
-        upload_resps = self.upload_multiple_files_by_paths(
-            project_full_slug=project_full_slug,
-            paths=list(upload_path_dict.values()),
-            desc="Uploading source files",
-        )
-        upload_resp_dict = {f: url for f, url in zip(upload_path_dict.keys(), upload_resps)}
-        for f in files:
-            p = str(f.rel_path_in_model_fs)
-            if f in upload_resp_dict:
-                source_files.append(
-                    schemas.SourceFileDecl(path=p, upload_id=upload_resp_dict[f].id)
-                )
-            else:
-                skipped_source_files.append(schemas.SkippedSourceFileDecl(path=p, size=f.size))
-
-        return source_files, skipped_source_files
-
     def get_server_metadata(self) -> schemas.ServerMetadata:
         f = furl(self.base_url)
         f.path = f.path / API_BASE_STR / "application"
@@ -357,6 +264,7 @@ class TungstenAPIClient:
             sess=self.sess,
             progress_bar=True,
             desc=desc,
+            follow_symlinks=True,
         )
         ret = []
         for p, resp in zip(paths, responses):

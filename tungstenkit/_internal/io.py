@@ -9,6 +9,7 @@ from enum import Enum
 from io import BufferedIOBase, TextIOBase
 from pathlib import Path
 
+import jsonref
 from binaryornot.check import is_binary
 from fastapi.encoders import jsonable_encoder
 from furl import furl
@@ -21,6 +22,7 @@ from typing_extensions import Literal
 from w3lib.url import parse_data_uri
 
 from tungstenkit._internal import contexts
+from tungstenkit._internal.utils.jsonschema import remove_useless_allof_in_jsonschema
 from tungstenkit._internal.utils.requests import download_file
 from tungstenkit._internal.utils.string import camel_to_snake
 from tungstenkit._internal.utils.uri import get_path_from_file_url, get_uri_scheme, save_data_url
@@ -33,11 +35,12 @@ IMAGE_MODES_IN_PILLOW = ["RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "1", "L",
 BUFFER_SIZE = 4 * 1024 * 1024
 
 
-class FileType(str, Enum):
+class FieldAnnotation(str, Enum):
     image = "image"
     video = "video"
     audio = "audio"
     binary = "binary"
+    masked_image = "masked_image"
 
 
 class URIForFile(str):
@@ -126,8 +129,14 @@ class URIForFile(str):
         field_schema["format"] = "uri"
 
 
+class AnnotatedField:
+    @classmethod
+    def _get_annotation(cls) -> FieldAnnotation:
+        return FieldAnnotation(camel_to_snake(cls.__name__))
+
+
 # TODO remove inheritance from BaseModel and __root__
-class File(BaseModel):
+class File(BaseModel, AnnotatedField):
     _schema_prefix: t.ClassVar[str] = "#/tungsten/"
     __root__: URIForFile
 
@@ -185,10 +194,6 @@ class File(BaseModel):
         default = field.default if field else None
         if isinstance(default, File):
             field_schema["default"] = default.__root__
-
-    @classmethod
-    def _get_typeenum(cls) -> FileType:
-        return FileType(camel_to_snake(cls.__name__))
 
 
 class Image(File):
@@ -274,38 +279,47 @@ class BaseIO(BaseModel):
         m.update(to_be_hashsed.encode("utf-8"))
         return "sha256:" + m.hexdigest()
 
+    if contexts.APP == contexts.Application.CLI:
+
+        @classmethod
+        def schema(cls, *args, **kwargs):
+            orig = super(BaseIO, cls).schema(*args, **kwargs)
+            derefed = jsonref.loads(json.dumps(orig))
+            remove_useless_allof_in_jsonschema(derefed)
+            derefed.pop("definitions", None)
+            return derefed
+
     class Config:
         validate_assignment = True
         validate_all = True
         arbitrary_types_allowed = True
 
+        if contexts.APP == contexts.Application.CLI:
 
-class MaskedImage(BaseIO):
+            @staticmethod
+            def schema_extra(schema: t.Dict[str, t.Any], model: t.Type["BaseIO"]) -> None:
+                schema.pop("title", None)
+                for prop in schema.get("properties", {}).values():
+                    prop.pop("title", None)
+
+
+class FileComposite(BaseIO, AnnotatedField):
+    pass
+
+
+class MaskedImage(FileComposite):
     image: Image
     mask: Image
 
     @validator("mask")
     def validate_mask(cls, v: Image, values: t.Dict[str, Image]):
-        pil_mask = v.to_pil_image("L").point(lambda p: 255 if p > 0 else 0).convert("1")
+        pil_mask = v.to_pil_image("L").point(lambda p: 255 if p > 0 else 0)
         pil_image = values["image"].to_pil_image()
         if pil_mask.size != pil_image.size:
-            raise ValueError("Mask size is different to the image's")
+            raise ValueError(
+                f"Mask size is different to the image's (image: {pil_image.size}, mask: {pil_mask.size})"  # noqa: E501
+            )
         return Image.from_pil_image(pil_mask)
-
-    if contexts.APP not in [contexts.Application.MODEL_SERVER, contexts.Application.TASK_SERVER]:
-
-        @classmethod
-        def __modify_schema__(
-            cls, field_schema: t.Dict[str, t.Any], field: t.Optional[ModelField]
-        ):
-            field_schema["$ref"] = "/schemas/v1/io.json#/definitions/MaskedImage"
-
-
-def filetype_to_cls(filetype: FileType) -> t.Type[File]:
-    for cls in File.__subclasses__():
-        if cls._get_typeenum() == filetype:
-            return cls
-    raise NotImplementedError(filetype)
 
 
 def Field(

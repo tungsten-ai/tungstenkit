@@ -152,3 +152,7 @@ class InvalidInput(TungstenException):
 
 class PredictionFailure(TungstenException):
     pass
+
+
+class UnsupportedModel(TungstenException):
+    pass

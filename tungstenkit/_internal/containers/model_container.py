@@ -76,7 +76,10 @@ class ModelContainer(ServerContainer):
                 dest_in_host.touch()
                 dest_in_container = self.bind_dir_in_container / dest_in_host.name
                 if move:
-                    os.replace(src_in_host, dest_in_host)
+                    try:
+                        os.replace(src_in_host, dest_in_host)
+                    except Exception:
+                        shutil.move(str(src_in_host), str(dest_in_host))
                 else:
                     fut = executor.submit(shutil.copy, str(src_in_host), str(dest_in_host))
                     future_list.append(fut)

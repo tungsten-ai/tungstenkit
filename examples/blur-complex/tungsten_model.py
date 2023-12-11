@@ -3,11 +3,12 @@ from typing import Dict, List, Optional, Tuple
 
 from PIL import ImageFilter
 
-from tungstenkit import BaseIO, Binary, Field, Image, Option, define_model
+from tungstenkit import BaseIO, Binary, Field, Image, MaskedImage, Option, define_model
 
 
 class Input(BaseIO):
     image: Image = Field(description="Image to blur")
+    masked_image: MaskedImage
     text: str = Field(description="hello")
     gaussian_kernel_radius: int = Option(
         5, description="Gaussian kernel size for blurring", ge=1, le=10
@@ -20,6 +21,7 @@ class Input(BaseIO):
     optional_image: Optional[Image] = Option(None)
     optional_image2: Image | None = Option(None)
     optional_binary: Optional[Binary] = Option(None)
+    optional_masked_image: Optional[MaskedImage] = Option(None)
 
 
 class Output(BaseIO):

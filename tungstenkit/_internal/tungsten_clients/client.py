@@ -1,5 +1,4 @@
 import typing as t
-from pathlib import Path
 
 from docker.client import DockerClient
 from docker.models.images import Image as DockerImage
@@ -86,11 +85,12 @@ class TungstenClient:
             else:
                 raise exceptions.Conflict(f"Project '{project_full_slug}' already exists.")
 
-        self.api.create_project_for_current_user(
+        proj = self.api.create_project_for_current_user(
             schemas.ProjectCreate(
                 slug=project_slug, description=description, nsfw=nsfw, public=not private
             )
         )
+        return proj
 
     def push_model(
         self,
@@ -142,9 +142,9 @@ class TungstenClient:
                 input_schema=model.io.input_schema,
                 output_schema=model.io.output_schema,
                 demo_output_schema=model.io.demo_output_schema,
-                input_filetypes=model.io.input_filetypes,
-                output_filetypes=model.io.output_filetypes,
-                demo_output_filetypes=model.io.demo_output_filetypes,
+                input_filetypes=model.io.input_annotations,
+                output_filetypes=model.io.output_annotations,
+                demo_output_filetypes=model.io.demo_output_annotations,
                 gpu_memory=int(model.gpu_mem_gb * 10**9)
                 if model.gpu and model.gpu_mem_gb
                 else 0,
@@ -202,23 +202,19 @@ class TungstenClient:
         image.tag(project_full_slug, model_version)
         docker_client.images.remove(remote_docker_repo + ":" + tag)
 
-        readme, source_files = None, []
-
         avatar = self.api.fetch_project_avatar(project_full_slug, project_in_server.avatar_url)
         io_data = storables.ModelIOData(
-            input_schema=model_in_server.input_schema,
+            input_schema=model_in_server.input_filetypes,
             output_schema=model_in_server.output_schema,
             demo_output_schema=model_in_server.demo_output_schema,
-            input_filetypes=model_in_server.input_filetypes,
-            output_filetypes=model_in_server.output_filetypes,
-            demo_output_filetypes=model_in_server.demo_output_filetypes,
+            input_annotations=model_in_server.input_filetypes,
+            output_annotations=model_in_server.output_filetypes,
+            demo_output_annotations=model_in_server.demo_output_filetypes,
         )
         m = storables.ModelData(
             name=local_model_name,
             io_data=io_data,
             avatar=avatar,
-            readme=readme,
-            source_files=source_files,
         )
         m.save(file_blob_create_policy="rename")
 

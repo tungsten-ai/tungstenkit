@@ -6,6 +6,7 @@ from tungstenkit import exceptions
 from tungstenkit._internal.io import build_uri_for_file
 from tungstenkit._internal.logging import log_warning
 from tungstenkit._internal.model_clients import ModelAPIClient
+from tungstenkit._internal.utils.file import get_file_size
 from tungstenkit._internal.utils.uri import check_if_file_uri, get_path_from_file_url
 
 from .abstract_interface import PredInterface
@@ -41,7 +42,8 @@ class ModelServer(PredInterface):
                 uri = build_uri_for_file(input[field_name])
                 if check_if_file_uri(uri):
                     p = get_path_from_file_url(uri)
-                    if p.stat().st_size > LARGE_FILE_THRESHOLD:
+                    p = p.resolve()
+                    if get_file_size(p) > LARGE_FILE_THRESHOLD:
                         log_warning(
                             f"File at input field {field_name} yields a too large data uri. "
                             "The input may not be processed."

@@ -3,8 +3,8 @@ import typing as t
 from pydantic import Field
 
 from tungstenkit import Audio, BaseIO, Binary, Image, Video
-from tungstenkit._internal.io import FileType
-from tungstenkit._internal.io_schema import get_filetypes, validate_input_class
+from tungstenkit._internal.io import FieldAnnotation
+from tungstenkit._internal.io_schema import get_annotations, validate_input_class
 
 
 def test_default_field_description():
@@ -45,14 +45,14 @@ def test_get_filetypes():
         somedict: t.Dict[str, float]
         somelist: t.List[int]
 
-    filetypes = get_filetypes(Output)
+    filetypes = get_annotations(Output)
     assert filetypes == {
-        "image": FileType.image,
-        "audio": FileType.audio,
-        "video": FileType.video,
-        "binary": FileType.binary,
-        "filedict.$item": FileType.image,
-        "filelist.$item": FileType.audio,
-        "nested.image": FileType.image,
-        "nested.filedict.$item": FileType.image,
+        "image": FieldAnnotation.image,
+        "audio": FieldAnnotation.audio,
+        "video": FieldAnnotation.video,
+        "binary": FieldAnnotation.binary,
+        "filedict.$item": FieldAnnotation.image,
+        "filelist.$item": FieldAnnotation.audio,
+        "nested.image": FieldAnnotation.image,
+        "nested.filedict.$item": FieldAnnotation.image,
     }

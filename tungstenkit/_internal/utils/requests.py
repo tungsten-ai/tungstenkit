@@ -19,7 +19,7 @@ from tungstenkit._internal.logging import log_debug
 from tungstenkit.exceptions import ClientError
 
 from .console import build_upload_and_download_progress
-from .file import convert_to_unique_path
+from .file import convert_to_unique_path, get_file_size
 from .uri import get_filename_from_uri
 
 if t.TYPE_CHECKING:
@@ -68,15 +68,17 @@ def upload_multiple_form_data_by_paths(
     sess: t.Optional[Session] = None,
     progress_bar: bool = False,
     desc: t.Optional[str] = None,
+    follow_symlinks: bool = True,
 ) -> t.List[requests.Response]:
     if len(file_paths) == 0:
         return []
 
+    file_paths = [p.resolve() for p in file_paths] if follow_symlinks else file_paths
     with ExitStack() as exit_stack:
         create_callback = None
         if progress_bar:
             desc = desc if desc else f"Uploading {len(file_paths)}"
-            total_bytes = sum(p.stat().st_size for p in file_paths)
+            total_bytes = sum(get_file_size(p) for p in file_paths)
             task, progress = exit_stack.enter_context(
                 build_upload_and_download_progress(description=desc, total=total_bytes)
             )
@@ -123,11 +125,14 @@ def upload_form_data_by_path(
     sess: t.Optional[Session] = None,
     progress_bar: bool = False,
     desc: t.Optional[str] = None,
+    follow_symlinks: bool = True,
 ) -> requests.Response:
+    file_path = file_path.resolve() if follow_symlinks else file_path
+
     with ExitStack() as exit_stack:
         create_callback = None
         if progress_bar:
-            total_bytes = file_path.stat().st_size
+            total_bytes = get_file_size(file_path)
             desc = f"Uploading {file_path.name}" if desc is None else desc
             task, progress = exit_stack.enter_context(
                 build_upload_and_download_progress(total=total_bytes, description=desc)
@@ -412,7 +417,7 @@ def _save_file_from_http_resp(
 def _get_file_metadata(file_path: Path):
     file_name = file_path.name
     content_type = mimetypes.guess_type(str(file_path), strict=False)[0]
-    size = file_path.stat().st_size
+    size = file_path.lstat() if file_path.is_symlink() else file_path.stat().st_size
     if content_type is None:
         content_type = "application/octet-stream" if is_binary(str(file_path)) else "text/plain"
 

@@ -19,6 +19,7 @@ from tungstenkit._internal.logging import log_debug, log_info
 from tungstenkit._internal.utils.context import hide_traceback
 from tungstenkit._internal.utils.file import (
     format_file_size,
+    get_file_size,
     get_tree_size_in_bytes,
     is_relative_to,
 )
@@ -323,7 +324,7 @@ class BuildContext:
             return
 
         progress = Progress(TextColumn("{task.description}"))
-        large_files_size = sum([p.stat().st_size for p in self._traverse_large_files()])
+        large_files_size = sum([get_file_size(p, follow_symlinks=False) for p in self._traverse_large_files()])
         desc_prefix = "Build context size: "
         task = progress.add_task(desc_prefix + f"{large_files_size}B")
 
@@ -369,13 +370,13 @@ class BuildContext:
 
     def _traverse_small_files(self) -> t.Generator[Path, t.Any, None]:
         return self._traverse_files(
-            lambda p: p.stat(follow_symlinks=False).st_size
+            lambda p: get_file_size(p, follow_symlinks=False)
             < constants.MIN_LARGE_FILE_SIZE_ON_BUILD
         )
 
     def _traverse_large_files(self) -> t.Generator[Path, t.Any, None]:
         return self._traverse_files(
-            lambda p: p.stat(follow_symlinks=False).st_size
+            lambda p: get_file_size(p, follow_symlinks=False)
             >= constants.MIN_LARGE_FILE_SIZE_ON_BUILD
         )
 

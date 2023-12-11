@@ -8,12 +8,13 @@ from tungstenkit import exceptions
 from tungstenkit._internal.blob_store import Blob, BlobStore, FileBlobCreatePolicy
 from tungstenkit._internal.constants import DEFAULT_GPU_MEM_GB
 from tungstenkit._internal.json_store import JSONItem, JSONStorable
+from tungstenkit._internal.logging import log_debug
 from tungstenkit._internal.utils.docker_client import (
     get_docker_client,
     parse_docker_image_name,
     remove_docker_image,
 )
-from tungstenkit._internal.utils.serialize import load_attrs_from_json
+from tungstenkit._internal.utils.serialize import convert_attrs_to_json, load_attrs_from_json
 
 from .avatar import AvatarData, StoredAvatar
 from .markdown import MarkdownData, StoredMarkdown
@@ -242,3 +243,8 @@ class ModelData(_ModelDataInImage, JSONStorable[StoredModelData]):
             if data.source_files
             else None,
         )
+
+    def save(self, file_blob_create_policy: FileBlobCreatePolicy = "copy") -> StoredModelData:
+        log_debug(f"Save {self} to json store")
+        log_debug(f"IO: {convert_attrs_to_json(self.io)}")
+        return super().save(file_blob_create_policy)
