@@ -204,7 +204,7 @@ class TungstenClient:
 
         avatar = self.api.fetch_project_avatar(project_full_slug, project_in_server.avatar_url)
         io_data = storables.ModelIOData(
-            input_schema=model_in_server.input_filetypes,
+            input_schema=model_in_server.input_schema,
             output_schema=model_in_server.output_schema,
             demo_output_schema=model_in_server.demo_output_schema,
             input_annotations=model_in_server.input_filetypes,
